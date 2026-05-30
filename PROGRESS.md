@@ -90,6 +90,39 @@
   - Share: filters selected assets, calls `shareMultipleAssets`, spinner on button, error alert
   - Add to Album: loads albums, presents `Alert.alert` action-sheet listing public albums, calls `addAssetsToAlbum` on selection, success haptic + alert, clears selection
 
+### Phase 7 — UI Polish
+**Branch:** `feat/ui-polish`
+
+- **`@expo/vector-icons` (Ionicons)** — installed and applied across the app, replacing all emoji placeholder icons:
+  - Tab bar: `images[-sharp]` / `albums[-sharp]` with active/inactive state via `focused` prop
+  - SelectionBar: `share-outline`, `add-circle-outline`, `trash-outline`
+  - Photo detail header: `chevron-back`, `ellipsis-horizontal`; footer: `share-outline`, `add-circle-outline`, `heart[-outline]` (red when favorited), `trash-outline`
+  - CreateAlbumSheet: `lock-closed` inline with label
+  - AlbumCard lock badge: `lock-closed` size 12 white
+
+- **`src/lib/theme.ts`** — single typed theme object (`as const`) with:
+  - `colors`: `background`, `surface`, `surfaceElevated`, `border`, `text`, `textSecondary` (80% white), `textTertiary` (60% white), `accent` (iOS blue `#0A84FF`), `accentGreen`, `accentRed`, `selectedOverlay`
+  - `spacing`: xs/sm/md/lg/xl (4/8/16/24/32)
+  - `radius`: sm/md/lg/xl (8/12/16/24)
+  - `typography`: caption/body/bodyMedium/title/headline with `fontWeight as const`
+  - Exports `Theme` and `ThemeColors` types
+  - Applied to: `index.tsx`, `albums.tsx`, `SelectionBar`, `DateSectionHeader`, `AlbumCard`, `CreateAlbumSheet`, `TripCard`, `TripsSection`
+
+- **`PhotoThumb.tsx`** — full rewrite:
+  - Thumbnail size: `Math.floor((SCREEN_WIDTH − 4) / 3)` — accounts for 2 × 2px inter-column gaps exactly; `THUMB_SIZE` exported for `PhotoGrid` to import
+  - Press animation: `Animated.spring` scales to `0.97` on `onPressIn`, back to `1` on `onPressOut`, `useNativeDriver: true`
+  - Selection checkmark: `Ionicons "checkmark-circle"` in `theme.colors.accent` when selected; `"ellipse-outline"` at 65% white when in selection mode but unselected
+  - Selected overlay: `theme.colors.selectedOverlay`
+
+- **`PhotoGrid.tsx`** — row gains `columnGap: 2` and `marginBottom: 2`; imports `THUMB_SIZE` from `PhotoThumb` to stay in sync
+
+- **`src/components/ui/Skeleton.tsx`** — new reusable pulsing placeholder:
+  - Props: `width: DimensionValue`, `height: number`, `borderRadius?: number`
+  - `Animated.loop` sequences opacity 0.3 → 0.7 → 0.3 at 700 ms per leg, `useNativeDriver: true`
+  - Layout on plain `View` wrapper, `Animated.View` fills absolutely carrying only `opacity` (avoids TS constraint on `Animated.View` width types)
+  - Base color: `theme.colors.surfaceElevated`
+  - Used in `PhotoGrid` (12 thumbnail squares, 4 rows × 3), `albums.tsx` (4 album cards, 2 rows × 2), `TripsSection` (2 trip card skeletons replacing plain `View` placeholders)
+
 ---
 
 ## Key Architecture Decisions
@@ -103,6 +136,9 @@
 | `Alert.alert` for album action sheet | No native action-sheet dependency needed; works cross-platform |
 | `StyleSheet.absoluteFill` not `absoluteFillObject` | `absoluteFillObject` doesn't exist in RN 0.85 |
 | `expo-linear-gradient` not used | Not installed; gradient replaced with `rgba` overlay + `textShadow` |
+| `Skeleton` uses a `View` wrapper + `Animated.View` fill | `Animated.View` only accepts `number \| "auto" \| \`${number}%\`` for width, not arbitrary `string`; wrapper holds layout, inner holds `opacity` |
+| `THUMB_SIZE` exported from `PhotoThumb` | Single source of truth for thumbnail dimensions; `PhotoGrid` imports it to keep row placeholder sizes in sync |
+| Press scale via `onPressIn`/`onPressOut` + `Animated.spring` | `Pressable` style prop only exposes opacity; `Animated.View` inside `Pressable` is needed for `transform: scale` with `useNativeDriver` |
 
 ---
 
@@ -124,11 +160,15 @@ src/
     sharing.ts              — shareAsset, shareMultipleAssets, saveAssetToLibrary
     haptics.ts              — impactLight, impactMedium
     dateUtils.ts            — groupAssetsByDate
+    theme.ts                — design token system (colors, spacing, radius, typography)
   store/
     galleryStore.ts
     selectionStore.ts
     albumStore.ts
     tripStore.ts
+  components/
+    ui/
+      Skeleton.tsx          — pulsing animated placeholder for loading states
   features/
     gallery/components/
       PhotoGrid.tsx
