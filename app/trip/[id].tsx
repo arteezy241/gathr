@@ -100,7 +100,7 @@ export default function TripDetailScreen() {
             asset={asset}
             isSelected={selectedIds.has(asset.id)}
             allAssetIds={allAssetIds}
-            onPress={() => { router.push(`/photo/${asset.id}`) }}
+            onPress={() => { router.push({ pathname: '/photo/[id]', params: { id: asset.id, context: 'trip', contextId: id } }) }}
             onLongPress={() => { selectAll([asset.id]); setLastSelected(asset.id) }}
           />
         ))}

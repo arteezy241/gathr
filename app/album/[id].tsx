@@ -71,7 +71,7 @@ export default function AlbumDetailScreen() {
             asset={asset}
             isSelected={selectedIds.has(asset.id)}
             allAssetIds={allAssetIds}
-            onPress={() => { router.push(`/photo/${asset.id}`) }}
+            onPress={() => { router.push({ pathname: '/photo/[id]', params: { id: asset.id, context: 'album', contextId: id } }) }}
             onLongPress={() => { selectAll([asset.id]); setLastSelected(asset.id) }}
           />
         ))}
