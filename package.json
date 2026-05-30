@@ -38,7 +38,8 @@
     "web": "expo start --web",
     "lint": "eslint src app --no-error-on-unmatched-pattern",
     "typecheck": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"app/**/*.{ts,tsx}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"app/**/*.{ts,tsx}\"",
+    "test": "echo \"No tests yet\" && exit 0"
   },
   "private": true
 }
