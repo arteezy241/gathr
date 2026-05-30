@@ -85,7 +85,7 @@ export function PhotoGrid({ listHeader }: Props) {
   const allAssetIds = useMemo(() => assets.map((a) => a.id), [assets])
 
   function handlePress(asset: MediaLibraryAsset) {
-    router.push(`/photo/${asset.id}`)
+    router.push({ pathname: '/photo/[id]', params: { id: asset.id, context: 'gallery' } })
   }
 
   function handleLongPress(asset: MediaLibraryAsset) {
