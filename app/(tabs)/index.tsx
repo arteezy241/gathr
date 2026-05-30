@@ -8,6 +8,7 @@ import { useTripStore } from '@/store/tripStore'
 import { PhotoGrid } from '@/features/gallery/components/PhotoGrid'
 import { SelectionBar } from '@/features/gallery/components/SelectionBar'
 import { TripsSection } from '@/features/gallery/components/TripsSection'
+import { theme } from '@/lib/theme'
 
 export default function GalleryScreen() {
   const { granted, requesting, request } = usePermissions()
@@ -76,35 +77,36 @@ export default function GalleryScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: theme.colors.background,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    padding: theme.spacing.xl,
+    backgroundColor: theme.colors.background,
   },
   permissionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 12,
+    ...theme.typography.headline,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
     textAlign: 'center',
   },
   permissionBody: {
-    fontSize: 15,
-    color: '#6C6C70',
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 28,
   },
   permissionButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.accent,
     paddingHorizontal: 28,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: theme.radius.md,
   },
   permissionButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: theme.colors.text,
+    ...theme.typography.title,
   },
 })

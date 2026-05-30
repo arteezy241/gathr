@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSelectionStore } from '@/store/selectionStore'
 import { impactLight } from '@/lib/haptics'
+import { theme } from '@/lib/theme'
 
 interface Props {
   label: string
@@ -60,14 +61,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#ffffff',
+    paddingHorizontal: theme.spacing.sm + 4,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.background,
   },
   label: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#000000',
+    ...theme.typography.bodyMedium,
+    color: theme.colors.text,
   },
   circle: {
     width: CIRCLE_SIZE,
@@ -77,11 +77,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   circleFilled: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.accent,
   },
   circleEmpty: {
     borderWidth: 2,
-    borderColor: 'rgba(0, 0, 0, 0.25)',
+    borderColor: theme.colors.border,
     backgroundColor: 'transparent',
   },
   checkmark: {
@@ -89,13 +89,13 @@ const styles = StyleSheet.create({
     height: 6,
     borderLeftWidth: 2,
     borderBottomWidth: 2,
-    borderColor: '#ffffff',
+    borderColor: theme.colors.text,
     transform: [{ rotate: '-45deg' }, { translateY: -1 }],
   },
   dash: {
     width: 10,
     height: 2,
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.accent,
     borderRadius: 1,
   },
 })

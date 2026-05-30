@@ -1,6 +1,8 @@
 import { Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
+import { Ionicons } from '@expo/vector-icons'
 import { type Album } from '@/lib/db'
+import { theme } from '@/lib/theme'
 
 interface Props {
   album: Album
@@ -30,7 +32,7 @@ export function AlbumCard({ album, assetCount, onPress }: Props) {
         )}
         {album.isPrivate && (
           <View style={styles.lockBadge}>
-            <Text style={styles.lockIcon}>🔒</Text>
+            <Ionicons name="lock-closed" size={12} color="#ffffff" />
           </View>
         )}
       </View>
@@ -43,12 +45,12 @@ export function AlbumCard({ album, assetCount, onPress }: Props) {
 const styles = StyleSheet.create({
   container: {
     width: CARD_SIZE,
-    marginBottom: 16,
+    marginBottom: theme.spacing.md,
   },
   imageContainer: {
     width: CARD_SIZE,
     height: CARD_SIZE,
-    borderRadius: 8,
+    borderRadius: theme.radius.sm,
     overflow: 'hidden',
   },
   image: {
@@ -58,29 +60,25 @@ const styles = StyleSheet.create({
   placeholder: {
     width: CARD_SIZE,
     height: CARD_SIZE,
-    backgroundColor: '#D1D1D6',
+    backgroundColor: theme.colors.surfaceElevated,
   },
   lockBadge: {
     position: 'absolute',
     top: 6,
     left: 6,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     borderRadius: 6,
     paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  lockIcon: {
-    fontSize: 12,
+    paddingVertical: 3,
   },
   name: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000000',
-    marginTop: 6,
+    ...theme.typography.bodyMedium,
+    color: theme.colors.text,
+    marginTop: theme.spacing.xs + 2,
   },
   count: {
-    fontSize: 13,
-    color: '#8E8E93',
+    ...theme.typography.caption,
+    color: theme.colors.textTertiary,
     marginTop: 2,
   },
 })

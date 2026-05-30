@@ -15,6 +15,7 @@ import {
 } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { Image } from 'expo-image'
+import { Ionicons } from '@expo/vector-icons'
 import { type MediaLibraryAsset } from '@/lib/mediaLibrary'
 import { getAlbumAssetIds, getTrip } from '@/lib/db'
 import { shareAsset } from '@/lib/sharing'
@@ -55,9 +56,11 @@ function toPhotoContext(value: string | undefined): PhotoContext | undefined {
   return undefined
 }
 
+type IoniconName = React.ComponentProps<typeof Ionicons>['name']
+
 interface ActionButtonProps {
   label: string
-  icon: string
+  icon: IoniconName
   onPress: () => void
   tint?: string
   loading?: boolean
@@ -75,7 +78,7 @@ function ActionButton({ label, icon, onPress, tint = '#ffffff', loading = false,
       {loading ? (
         <ActivityIndicator size="small" color={tint} style={styles.actionSpinner} />
       ) : (
-        <Text style={[styles.actionIcon, { color: tint }]}>{icon}</Text>
+        <Ionicons name={icon} size={26} color={tint} />
       )}
       <Text style={[styles.actionLabel, { color: tint }]}>{label}</Text>
     </Pressable>
@@ -335,14 +338,14 @@ export default function PhotoDetailScreen() {
           pointerEvents={overlaysVisible ? 'box-none' : 'none'}
         >
           <Pressable style={styles.headerButton} onPress={() => { router.back() }} hitSlop={12}>
-            <Text style={styles.headerIcon}>‹</Text>
+            <Ionicons name="chevron-back" size={28} color="#ffffff" />
           </Pressable>
           <Pressable
             style={styles.headerButton}
             onPress={() => { /* options sheet — later phase */ }}
             hitSlop={12}
           >
-            <Text style={styles.headerIcon}>•••</Text>
+            <Ionicons name="ellipsis-horizontal" size={24} color="#ffffff" />
           </Pressable>
         </Animated.View>
 
@@ -357,18 +360,19 @@ export default function PhotoDetailScreen() {
           <View style={styles.actions}>
             <ActionButton
               label="Share"
-              icon="⬆"
+              icon="share-outline"
               onPress={() => { void handleShare() }}
               loading={isSharing}
               disabled={isSharing || currentAsset === null}
             />
-            <ActionButton label="Album" icon="🗂️" onPress={() => { /* later phase */ }} />
+            <ActionButton label="Album" icon="add-circle-outline" onPress={() => { /* later phase */ }} />
             <ActionButton
               label="Favorite"
-              icon={isFavorited ? '❤️' : '🤍'}
+              icon={isFavorited ? 'heart' : 'heart-outline'}
+              tint={isFavorited ? '#FF3B30' : '#ffffff'}
               onPress={() => { setIsFavorited((prev) => !prev) }}
             />
-            <ActionButton label="Delete" icon="🗑️" onPress={handleDelete} tint="#FF453A" />
+            <ActionButton label="Delete" icon="trash-outline" onPress={handleDelete} tint="#FF453A" />
           </View>
         </Animated.View>
       </View>
@@ -415,12 +419,6 @@ const styles = StyleSheet.create({
   headerButton: {
     padding: 4,
   },
-  headerIcon: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '300',
-    lineHeight: 28,
-  },
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -449,9 +447,6 @@ const styles = StyleSheet.create({
   },
   actionButtonDisabled: {
     opacity: 0.45,
-  },
-  actionIcon: {
-    fontSize: 24,
   },
   actionSpinner: {
     width: 24,
