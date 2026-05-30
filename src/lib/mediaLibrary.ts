@@ -3,7 +3,7 @@
  * Features must never import expo-media-library directly.
  */
 import {
-  type Asset,
+  Asset,
   type PermissionResponse,
   Query,
   AssetField,
@@ -12,7 +12,8 @@ import {
   getPermissionsAsync,
 } from 'expo-media-library/next'
 
-export type { Asset, PermissionResponse }
+export type { PermissionResponse }
+export { Asset }
 
 /** Stable public alias for the expo-media-library Asset type. */
 export type MediaLibraryAsset = Asset
@@ -37,6 +38,10 @@ export async function getPhotosByDate(
     .offset(offset)
     .limit(limit)
     .exe()
+}
+
+export async function createAsset(uri: string): Promise<void> {
+  await Asset.create(uri)
 }
 
 export async function getRecentPhotos(limit: number): Promise<Asset[]> {

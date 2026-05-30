@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
@@ -16,6 +17,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { Image } from 'expo-image'
 import { type MediaLibraryAsset } from '@/lib/mediaLibrary'
 import { getAlbumAssetIds, getTrip } from '@/lib/db'
+import { shareAsset } from '@/lib/sharing'
 import { useGalleryStore } from '@/store/galleryStore'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
@@ -58,12 +60,23 @@ interface ActionButtonProps {
   icon: string
   onPress: () => void
   tint?: string
+  loading?: boolean
+  disabled?: boolean
 }
 
-function ActionButton({ label, icon, onPress, tint = '#ffffff' }: ActionButtonProps) {
+function ActionButton({ label, icon, onPress, tint = '#ffffff', loading = false, disabled = false }: ActionButtonProps) {
   return (
-    <Pressable style={styles.actionButton} onPress={onPress} hitSlop={8}>
-      <Text style={[styles.actionIcon, { color: tint }]}>{icon}</Text>
+    <Pressable
+      style={[styles.actionButton, disabled && styles.actionButtonDisabled]}
+      onPress={onPress}
+      hitSlop={8}
+      disabled={disabled}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color={tint} style={styles.actionSpinner} />
+      ) : (
+        <Text style={[styles.actionIcon, { color: tint }]}>{icon}</Text>
+      )}
       <Text style={[styles.actionLabel, { color: tint }]}>{label}</Text>
     </Pressable>
   )
@@ -83,6 +96,7 @@ export default function PhotoDetailScreen() {
   const [contextAssets, setContextAssets] = useState<MediaLibraryAsset[] | null>(null)
   const [currentAssetId, setCurrentAssetId] = useState(id)
   const [isFavorited, setIsFavorited] = useState(false)
+  const [isSharing, setIsSharing] = useState(false)
   const [currentDate, setCurrentDate] = useState<string | null>(null)
   const [overlaysVisible, setOverlaysVisible] = useState(true)
 
@@ -246,6 +260,20 @@ export default function PhotoDetailScreen() {
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
+  const currentAsset = contextAssets?.find((a) => a.id === currentAssetId) ?? null
+
+  async function handleShare(): Promise<void> {
+    if (currentAsset === null || isSharing) return
+    setIsSharing(true)
+    try {
+      await shareAsset(currentAsset)
+    } catch (e) {
+      Alert.alert('Share Failed', e instanceof Error ? e.message : 'An error occurred while sharing.')
+    } finally {
+      setIsSharing(false)
+    }
+  }
+
   function handleDelete() {
     Alert.alert('Delete Photo', 'This photo will be deleted from your library.', [
       { text: 'Cancel', style: 'cancel' },
@@ -327,7 +355,13 @@ export default function PhotoDetailScreen() {
             <Text style={styles.dateText}>{currentDate}</Text>
           )}
           <View style={styles.actions}>
-            <ActionButton label="Share" icon="⬆" onPress={() => { /* later phase */ }} />
+            <ActionButton
+              label="Share"
+              icon="⬆"
+              onPress={() => { void handleShare() }}
+              loading={isSharing}
+              disabled={isSharing || currentAsset === null}
+            />
             <ActionButton label="Album" icon="🗂️" onPress={() => { /* later phase */ }} />
             <ActionButton
               label="Favorite"
@@ -413,8 +447,15 @@ const styles = StyleSheet.create({
     gap: 6,
     minWidth: 56,
   },
+  actionButtonDisabled: {
+    opacity: 0.45,
+  },
   actionIcon: {
     fontSize: 24,
+  },
+  actionSpinner: {
+    width: 24,
+    height: 24,
   },
   actionLabel: {
     fontSize: 11,
