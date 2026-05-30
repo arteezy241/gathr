@@ -22,6 +22,7 @@ export default [
       'import/resolver': {
         typescript: { project: './tsconfig.json' },
       },
+      'import/ignore': ['react-native'],
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
