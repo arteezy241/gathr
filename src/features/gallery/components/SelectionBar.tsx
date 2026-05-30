@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react'
-import { Alert, Animated, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { ActivityIndicator, Alert, Animated, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useSelectionStore } from '@/store/selectionStore'
 import { useGalleryStore } from '@/store/galleryStore'
-import { impactLight } from '@/lib/haptics'
+import { useAlbumStore } from '@/store/albumStore'
+import { impactLight, impactMedium } from '@/lib/haptics'
+import { shareMultipleAssets } from '@/lib/sharing'
 
 const BAR_HEIGHT = 56
 
@@ -12,7 +14,11 @@ export function SelectionBar() {
   const isSelecting = useSelectionStore((s) => s.isSelecting)
   const selectedIds = useSelectionStore((s) => s.selectedIds)
   const selectAll = useSelectionStore((s) => s.selectAll)
+  const clearSelection = useSelectionStore((s) => s.clearSelection)
   const assets = useGalleryStore((s) => s.assets)
+  const { albums, loadAlbums, addAssetsToAlbum } = useAlbumStore()
+
+  const [isSharing, setIsSharing] = useState(false)
 
   const translateY = useRef(new Animated.Value(BAR_HEIGHT + insets.bottom)).current
 
@@ -30,14 +36,43 @@ export function SelectionBar() {
     selectAll(assets.map((a) => a.id))
   }
 
-  function handleShare() {
+  async function handleShare(): Promise<void> {
+    if (isSharing) return
     void impactLight()
-    console.log('Share:', [...selectedIds])
+    const selected = assets.filter((a) => selectedIds.has(a.id))
+    setIsSharing(true)
+    try {
+      await shareMultipleAssets(selected)
+    } catch (e) {
+      Alert.alert('Share Failed', e instanceof Error ? e.message : 'An error occurred while sharing.')
+    } finally {
+      setIsSharing(false)
+    }
   }
 
-  function handleAddToAlbum() {
+  function handleAddToAlbum(): void {
     void impactLight()
-    console.log('Add to album:', [...selectedIds])
+    void loadAlbums()
+    const publicAlbums = albums.filter((a) => !a.isPrivate)
+    if (publicAlbums.length === 0) {
+      Alert.alert('No Albums', 'Create an album first before adding photos.')
+      return
+    }
+    const buttons: Array<{ text: string; onPress?: () => void; style?: 'cancel' | 'destructive' | 'default' }> = [
+      ...publicAlbums.map((album) => ({
+        text: album.name,
+        onPress: () => {
+          void (async () => {
+            await addAssetsToAlbum(album.id, [...selectedIds])
+            void impactMedium()
+            clearSelection()
+            Alert.alert('Added', `Added to ${album.name}`)
+          })()
+        },
+      })),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]
+    Alert.alert('Add to Album', 'Choose an album', buttons)
   }
 
   function handleDelete() {
@@ -78,8 +113,17 @@ export function SelectionBar() {
         </Text>
 
         <View style={styles.actions}>
-          <Pressable onPress={handleShare} style={styles.iconButton} hitSlop={8}>
-            <Text style={styles.iconLabel}>↑</Text>
+          <Pressable
+            onPress={() => { void handleShare() }}
+            style={[styles.iconButton, isSharing && styles.iconButtonDisabled]}
+            hitSlop={8}
+            disabled={isSharing}
+          >
+            {isSharing ? (
+              <ActivityIndicator size="small" color="#007AFF" />
+            ) : (
+              <Text style={styles.iconLabel}>↑</Text>
+            )}
           </Pressable>
           <Pressable onPress={handleAddToAlbum} style={styles.iconButton} hitSlop={8}>
             <Text style={styles.iconLabel}>＋</Text>
@@ -133,6 +177,9 @@ const styles = StyleSheet.create({
   iconButton: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconButtonDisabled: {
+    opacity: 0.45,
   },
   deleteButton: {},
   iconLabel: {
