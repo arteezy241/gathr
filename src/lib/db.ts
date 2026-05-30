@@ -1,4 +1,5 @@
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite'
+import { type TripGroup } from '@/lib/tripGrouper'
 
 export type Album = {
   id: string
@@ -20,6 +21,30 @@ interface AlbumRow {
 
 interface AssetIdRow {
   asset_id: string
+}
+
+export type StoredTrip = {
+  id: string
+  label: string
+  subtitle: string
+  startDate: number
+  endDate: number
+  coverAssetId: string
+  photoCount: number
+  durationDays: number
+  createdAt: number
+}
+
+interface TripRow {
+  id: string
+  label: string
+  subtitle: string
+  start_date: number
+  end_date: number
+  cover_asset_id: string
+  photo_count: number
+  duration_days: number
+  created_at: number
 }
 
 let _db: SQLiteDatabase | null = null
@@ -55,6 +80,18 @@ export async function initDb(): Promise<void> {
       cover_asset_id TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS trips (
+      id TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      subtitle TEXT NOT NULL,
+      start_date INTEGER NOT NULL,
+      end_date INTEGER NOT NULL,
+      cover_asset_id TEXT NOT NULL,
+      photo_count INTEGER NOT NULL,
+      duration_days INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS album_assets (
@@ -146,4 +183,61 @@ export async function updateAlbumCover(albumId: string, assetId: string): Promis
     'UPDATE albums SET cover_asset_id = ?, updated_at = ? WHERE id = ?',
     [assetId, Date.now(), albumId],
   )
+}
+
+function rowToStoredTrip(row: TripRow): StoredTrip {
+  return {
+    id: row.id,
+    label: row.label,
+    subtitle: row.subtitle,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    coverAssetId: row.cover_asset_id,
+    photoCount: row.photo_count,
+    durationDays: row.duration_days,
+    createdAt: row.created_at,
+  }
+}
+
+export async function saveTrips(trips: TripGroup[]): Promise<void> {
+  if (trips.length === 0) return
+  const db = await getDb()
+  const now = Date.now()
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    for (const trip of trips) {
+      await txn.runAsync(
+        `INSERT OR REPLACE INTO trips
+          (id, label, subtitle, start_date, end_date, cover_asset_id, photo_count, duration_days, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          trip.id,
+          trip.label,
+          trip.subtitle,
+          trip.startDate.getTime(),
+          trip.endDate.getTime(),
+          trip.coverAsset.id,
+          trip.photoCount,
+          trip.durationDays,
+          now,
+        ],
+      )
+    }
+  })
+}
+
+export async function getTrips(): Promise<StoredTrip[]> {
+  const db = await getDb()
+  const rows = await db.getAllAsync<TripRow>('SELECT * FROM trips ORDER BY start_date DESC', [])
+  return rows.map(rowToStoredTrip)
+}
+
+export async function getTrip(id: string): Promise<StoredTrip | null> {
+  const db = await getDb()
+  const row = await db.getFirstAsync<TripRow>('SELECT * FROM trips WHERE id = ?', [id])
+  return row !== null ? rowToStoredTrip(row) : null
+}
+
+export async function clearTrips(): Promise<void> {
+  const db = await getDb()
+  await db.runAsync('DELETE FROM trips', [])
 }

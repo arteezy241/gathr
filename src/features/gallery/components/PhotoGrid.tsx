@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { type ReactElement, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Dimensions, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list'
@@ -39,7 +39,11 @@ function getItemType(item: ListItem): string {
   return item.type
 }
 
-export function PhotoGrid() {
+interface Props {
+  listHeader?: ReactElement
+}
+
+export function PhotoGrid({ listHeader }: Props) {
   const router = useRouter()
   const { assets, isLoading, error, hasNextPage, loadMore } = useGallery()
   const { selectedIds, isSelecting, selectAll } = useSelectionStore()
@@ -157,6 +161,7 @@ export function PhotoGrid() {
       keyExtractor={keyExtractor}
       getItemType={getItemType}
       numColumns={1}
+      ListHeaderComponent={listHeader}
       onEndReached={handleEndReached}
       onEndReachedThreshold={0.5}
       ListEmptyComponent={

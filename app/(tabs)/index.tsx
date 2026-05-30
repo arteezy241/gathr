@@ -1,17 +1,29 @@
+import { useEffect } from 'react'
 import { Button, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { Stack } from 'expo-router'
 import { usePermissions } from '@/hooks/usePermissions'
+import { useGalleryStore } from '@/store/galleryStore'
 import { useSelectionStore } from '@/store/selectionStore'
+import { useTripStore } from '@/store/tripStore'
 import { PhotoGrid } from '@/features/gallery/components/PhotoGrid'
 import { SelectionBar } from '@/features/gallery/components/SelectionBar'
+import { TripsSection } from '@/features/gallery/components/TripsSection'
 
 export default function GalleryScreen() {
   const { granted, requesting, request } = usePermissions()
   const isSelecting = useSelectionStore((s) => s.isSelecting)
   const selectedIds = useSelectionStore((s) => s.selectedIds)
   const clearSelection = useSelectionStore((s) => s.clearSelection)
+  const assets = useGalleryStore((s) => s.assets)
+  const { lastGroupedAt, detectAndSaveTrips } = useTripStore()
 
   const selectedCount = selectedIds.size
+
+  useEffect(() => {
+    if (assets.length > 0 && lastGroupedAt === null) {
+      void detectAndSaveTrips(assets)
+    }
+  }, [assets, lastGroupedAt, detectAndSaveTrips])
 
   if (requesting) {
     return (
@@ -54,7 +66,7 @@ export default function GalleryScreen() {
         }
       />
       <View style={styles.screen}>
-        <PhotoGrid />
+        <PhotoGrid listHeader={<TripsSection />} />
         <SelectionBar />
       </View>
     </>
