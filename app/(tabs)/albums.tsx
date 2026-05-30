@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Stack, useRouter } from 'expo-router'
+import { theme } from '@/lib/theme'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { type Album, initDb } from '@/lib/db'
@@ -8,6 +10,9 @@ import { useAlbumStore } from '@/store/albumStore'
 import { useBiometricAuth } from '@/features/private-albums/hooks/useBiometricAuth'
 import { AlbumCard } from '@/features/albums/components/AlbumCard'
 import { CreateAlbumSheet } from '@/features/albums/components/CreateAlbumSheet'
+
+const ALBUM_CARD_SIZE = Math.floor((Dimensions.get('window').width - 3) / 2)
+const SKELETON_ALBUM_COUNT = 4
 
 interface AlbumRow {
   left: Album
@@ -112,7 +117,22 @@ export default function AlbumsScreen() {
       <Stack.Screen options={{ title: 'Albums' }} />
 
       <View style={styles.screen}>
-        {!isLoading && albums.length === 0 ? (
+        {isLoading && albums.length === 0 ? (
+          <View style={styles.skeletonGrid}>
+            {Array.from({ length: SKELETON_ALBUM_COUNT / 2 }).map((_, rowIndex) => (
+              <View key={rowIndex} style={styles.skeletonRow}>
+                {Array.from({ length: 2 }).map((__, colIndex) => (
+                  <Skeleton
+                    key={colIndex}
+                    width={ALBUM_CARD_SIZE}
+                    height={ALBUM_CARD_SIZE}
+                    borderRadius={theme.radius.sm}
+                  />
+                ))}
+              </View>
+            ))}
+          </View>
+        ) : !isLoading && albums.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>No Albums Yet</Text>
             <Text style={styles.emptyBody}>Tap + to create your first album.</Text>
@@ -148,10 +168,18 @@ export default function AlbumsScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.colors.background,
+  },
+  skeletonGrid: {
+    padding: theme.spacing.sm + 4,
+    gap: 4,
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   listContent: {
-    padding: 12,
+    padding: theme.spacing.sm + 4,
   },
   row: {
     flexDirection: 'row',
@@ -166,17 +194,16 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    padding: theme.spacing.xl,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 8,
+    ...theme.typography.headline,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
   },
   emptyBody: {
-    fontSize: 15,
-    color: '#8E8E93',
+    ...theme.typography.body,
+    color: theme.colors.textTertiary,
     textAlign: 'center',
   },
   fab: {
@@ -185,7 +212,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000000',
@@ -196,7 +223,7 @@ const styles = StyleSheet.create({
   },
   fabIcon: {
     fontSize: 28,
-    color: '#ffffff',
+    color: theme.colors.text,
     lineHeight: 32,
   },
 })

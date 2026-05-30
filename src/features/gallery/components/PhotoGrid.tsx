@@ -1,5 +1,5 @@
 import { type ReactElement, useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Dimensions, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list'
 import { type MediaLibraryAsset } from '@/lib/mediaLibrary'
@@ -7,12 +7,12 @@ import { groupAssetsByDate } from '@/lib/dateUtils'
 import { impactMedium } from '@/lib/haptics'
 import { useGallery } from '@/features/gallery/hooks/useGallery'
 import { useSelectionStore } from '@/store/selectionStore'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { DateSectionHeader } from './DateSectionHeader'
-import { PhotoThumb } from './PhotoThumb'
+import { PhotoThumb, THUMB_SIZE } from './PhotoThumb'
 
 const NUM_COLUMNS = 3
-const SCREEN_WIDTH = Dimensions.get('window').width
-const THUMB_SIZE = Math.floor(SCREEN_WIDTH / NUM_COLUMNS)
+const SKELETON_COUNT = 12
 
 interface HeaderItem {
   type: 'header'
@@ -139,9 +139,20 @@ export function PhotoGrid({ listHeader }: Props) {
   }
 
   if (isLoading && assets.length === 0) {
+    const skeletonRows = Array.from({ length: Math.ceil(SKELETON_COUNT / NUM_COLUMNS) })
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
+      <View style={styles.skeletonGrid}>
+        {skeletonRows.map((_, rowIndex) => (
+          <View key={rowIndex} style={styles.row}>
+            {Array.from({ length: NUM_COLUMNS }).map((__, colIndex) => (
+              <Skeleton
+                key={colIndex}
+                width={THUMB_SIZE}
+                height={THUMB_SIZE}
+              />
+            ))}
+          </View>
+        ))}
       </View>
     )
   }
@@ -180,6 +191,9 @@ export function PhotoGrid({ listHeader }: Props) {
 }
 
 const styles = StyleSheet.create({
+  skeletonGrid: {
+    gap: 2,
+  },
   centered: {
     flex: 1,
     alignItems: 'center',
@@ -188,6 +202,8 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
+    columnGap: 2,
+    marginBottom: 2,
   },
   thumbPlaceholder: {
     width: THUMB_SIZE,

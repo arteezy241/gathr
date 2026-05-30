@@ -3,6 +3,8 @@ import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react
 import { useRouter } from 'expo-router'
 import { useGalleryStore } from '@/store/galleryStore'
 import { useTripStore } from '@/store/tripStore'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { theme } from '@/lib/theme'
 import { TripCard } from './TripCard'
 
 const CARD_WIDTH = Dimensions.get('window').width - 32
@@ -39,8 +41,8 @@ export function TripsSection() {
       >
         {isLoading ? (
           <>
-            <View style={styles.placeholder} />
-            <View style={styles.placeholder} />
+            <Skeleton width={CARD_WIDTH} height={CARD_HEIGHT} borderRadius={theme.radius.lg} />
+            <Skeleton width={CARD_WIDTH} height={CARD_HEIGHT} borderRadius={theme.radius.lg} />
           </>
         ) : (
           trips.map((trip) => (
@@ -70,13 +72,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   headerTitle: {
+    ...theme.typography.headline,
     fontSize: 20,
-    fontWeight: '700',
-    color: '#000000',
+    color: theme.colors.text,
   },
   seeAll: {
-    fontSize: 15,
-    color: '#007AFF',
+    ...theme.typography.body,
+    color: theme.colors.accent,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -84,12 +86,5 @@ const styles = StyleSheet.create({
   },
   cardWrapper: {
     width: CARD_WIDTH,
-  },
-  placeholder: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    borderRadius: 16,
-    backgroundColor: '#D1D1D6',
-    marginRight: 12,
   },
 })

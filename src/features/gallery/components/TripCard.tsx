@@ -2,6 +2,7 @@ import { Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-n
 import { Image } from 'expo-image'
 import { type StoredTrip } from '@/lib/db'
 import { type MediaLibraryAsset } from '@/lib/mediaLibrary'
+import { theme } from '@/lib/theme'
 
 interface Props {
   trip: StoredTrip
@@ -45,9 +46,9 @@ const styles = StyleSheet.create({
   container: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    borderRadius: 16,
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
-    backgroundColor: '#2C2C2E',
+    backgroundColor: theme.colors.surfaceElevated,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.28,
@@ -55,7 +56,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   placeholder: {
-    backgroundColor: '#2C2C2E',
+    backgroundColor: theme.colors.surfaceElevated,
   },
   gradient: {
     position: 'absolute',
@@ -64,23 +65,22 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: 100,
     justifyContent: 'flex-end',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
     backgroundColor: 'rgba(0,0,0,0)',
-    // simulate gradient: bottom half darkens via a second overlay approach
   },
   label: {
+    ...theme.typography.headline,
     fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
   subtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.75)',
+    color: theme.colors.textSecondary,
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,

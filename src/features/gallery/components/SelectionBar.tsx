@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Animated, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { theme } from '@/lib/theme'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useSelectionStore } from '@/store/selectionStore'
 import { useGalleryStore } from '@/store/galleryStore'
@@ -120,16 +122,16 @@ export function SelectionBar() {
             disabled={isSharing}
           >
             {isSharing ? (
-              <ActivityIndicator size="small" color="#007AFF" />
+              <ActivityIndicator size="small" color={theme.colors.accent} />
             ) : (
-              <Text style={styles.iconLabel}>↑</Text>
+              <Ionicons name="share-outline" size={22} color={theme.colors.accent} />
             )}
           </Pressable>
           <Pressable onPress={handleAddToAlbum} style={styles.iconButton} hitSlop={8}>
-            <Text style={styles.iconLabel}>＋</Text>
+            <Ionicons name="add-circle-outline" size={22} color={theme.colors.accent} />
           </Pressable>
           <Pressable onPress={handleDelete} style={[styles.iconButton, styles.deleteButton]} hitSlop={8}>
-            <Text style={[styles.iconLabel, styles.deleteLabel]}>🗑</Text>
+            <Ionicons name="trash-outline" size={22} color={theme.colors.accentRed} />
           </Pressable>
         </View>
       </View>
@@ -143,36 +145,34 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: theme.colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(0,0,0,0.2)',
+    borderTopColor: theme.colors.border,
   },
   inner: {
     height: BAR_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: theme.spacing.md,
   },
   sideButton: {
     flex: 1,
     alignItems: 'flex-start',
   },
   sideButtonText: {
-    fontSize: 15,
-    color: '#007AFF',
-    fontWeight: '500',
+    ...theme.typography.bodyMedium,
+    color: theme.colors.accent,
   },
   countLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#000000',
+    ...theme.typography.bodyMedium,
+    color: theme.colors.text,
     textAlign: 'center',
   },
   actions: {
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 16,
+    gap: theme.spacing.md,
   },
   iconButton: {
     alignItems: 'center',
@@ -182,11 +182,4 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   deleteButton: {},
-  iconLabel: {
-    fontSize: 18,
-    color: '#007AFF',
-  },
-  deleteLabel: {
-    color: '#FF3B30',
-  },
 })
