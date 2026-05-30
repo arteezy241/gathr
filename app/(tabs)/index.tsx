@@ -3,6 +3,7 @@ import { Stack } from 'expo-router'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useSelectionStore } from '@/store/selectionStore'
 import { PhotoGrid } from '@/features/gallery/components/PhotoGrid'
+import { SelectionBar } from '@/features/gallery/components/SelectionBar'
 
 export default function GalleryScreen() {
   const { granted, requesting, request } = usePermissions()
@@ -52,12 +53,18 @@ export default function GalleryScreen() {
             : { title: 'Gathr' }
         }
       />
-      <PhotoGrid />
+      <View style={styles.screen}>
+        <PhotoGrid />
+        <SelectionBar />
+      </View>
     </>
   )
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   centered: {
     flex: 1,
     alignItems: 'center',

@@ -11,6 +11,7 @@ const BORDER_RADIUS = CIRCLE_SIZE / 2
 interface Props {
   asset: MediaLibraryAsset
   isSelected: boolean
+  allAssetIds: string[]
   onPress: () => void
   onLongPress: () => void
 }
@@ -19,18 +20,31 @@ function assetUri(asset: MediaLibraryAsset): string {
   return Platform.OS === 'ios' ? `ph://${asset.id}` : asset.id
 }
 
-export function PhotoThumb({ asset, isSelected, onPress, onLongPress }: Props) {
+export function PhotoThumb({ asset, isSelected, allAssetIds, onPress, onLongPress }: Props) {
   const isSelecting = useSelectionStore((s) => s.isSelecting)
+  const lastSelectedId = useSelectionStore((s) => s.lastSelectedId)
+  const toggleSelect = useSelectionStore((s) => s.toggleSelect)
+  const selectRange = useSelectionStore((s) => s.selectRange)
+  const setLastSelected = useSelectionStore((s) => s.setLastSelected)
 
   function handlePress() {
     if (isSelecting) {
       void impactLight()
+      if (lastSelectedId !== null) {
+        selectRange(allAssetIds, lastSelectedId, asset.id)
+      } else {
+        toggleSelect(asset.id)
+      }
+      setLastSelected(asset.id)
+    } else {
+      onPress()
     }
-    onPress()
   }
 
   function handleLongPress() {
     void impactLight()
+    toggleSelect(asset.id)
+    setLastSelected(asset.id)
     onLongPress()
   }
 
