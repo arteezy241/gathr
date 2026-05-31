@@ -3,17 +3,60 @@ import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react
 import { useRouter } from 'expo-router'
 import { useGalleryStore } from '@/store/galleryStore'
 import { useTripStore } from '@/store/tripStore'
+import { type StoredTrip } from '@/lib/db'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { theme } from '@/lib/theme'
+import { useTheme } from '@/lib/themeContext'
+import { radius, spacing, typography, type ThemeColors } from '@/lib/theme'
 import { TripCard } from './TripCard'
 
 const CARD_WIDTH = Dimensions.get('window').width - 32
 const CARD_HEIGHT = 200
 
+/** One representative trip per place (most recent), with a count if clustered. */
+type TripCluster = {
+  representativeTrip: StoredTrip
+  count: number
+}
+
+function clusterByPlace(trips: StoredTrip[]): TripCluster[] {
+  const placeMap = new Map<string, StoredTrip[]>()
+  const noPlace: StoredTrip[] = []
+
+  for (const trip of trips) {
+    if (trip.place !== null) {
+      const key = trip.place.toLowerCase()
+      const existing = placeMap.get(key) ?? []
+      existing.push(trip)
+      placeMap.set(key, existing)
+    } else {
+      noPlace.push(trip)
+    }
+  }
+
+  const clusters: TripCluster[] = []
+
+  // Place clusters — show most recent trip as representative
+  for (const group of placeMap.values()) {
+    const sorted = [...group].sort((a, b) => b.startDate - a.startDate)
+    clusters.push({ representativeTrip: sorted[0]!, count: group.length })
+  }
+
+  // Ungrouped trips (no location data)
+  for (const trip of noPlace) {
+    clusters.push({ representativeTrip: trip, count: 1 })
+  }
+
+  // Sort clusters by most recent trip date
+  return clusters.sort((a, b) => b.representativeTrip.startDate - a.representativeTrip.startDate)
+}
+
 export function TripsSection() {
   const router = useRouter()
+  const { colors } = useTheme()
   const { trips, isLoading } = useTripStore()
   const assets = useGalleryStore((s) => s.assets)
+
+  const styles = useMemo(() => makeStyles(colors), [colors])
 
   const assetMap = useMemo(() => {
     const map = new Map<string, (typeof assets)[number]>()
@@ -22,6 +65,8 @@ export function TripsSection() {
     }
     return map
   }, [assets])
+
+  const clusters = useMemo(() => clusterByPlace(trips), [trips])
 
   if (!isLoading && trips.length === 0) return null
 
@@ -41,17 +86,22 @@ export function TripsSection() {
       >
         {isLoading ? (
           <>
-            <Skeleton width={CARD_WIDTH} height={CARD_HEIGHT} borderRadius={theme.radius.lg} />
-            <Skeleton width={CARD_WIDTH} height={CARD_HEIGHT} borderRadius={theme.radius.lg} />
+            <Skeleton width={CARD_WIDTH} height={CARD_HEIGHT} borderRadius={radius.lg} />
+            <Skeleton width={CARD_WIDTH} height={CARD_HEIGHT} borderRadius={radius.lg} />
           </>
         ) : (
-          trips.map((trip) => (
+          clusters.map(({ representativeTrip: trip, count }) => (
             <View key={trip.id} style={styles.cardWrapper}>
               <TripCard
                 trip={trip}
                 coverAsset={assetMap.get(trip.coverAssetId)}
                 onPress={() => { router.push(`/trip/${trip.id}`) }}
               />
+              {count > 1 && (
+                <View style={styles.clusterBadge}>
+                  <Text style={styles.clusterText}>{count} trips</Text>
+                </View>
+              )}
             </View>
           ))
         )}
@@ -60,31 +110,47 @@ export function TripsSection() {
   )
 }
 
-const styles = StyleSheet.create({
-  section: {
-    marginBottom: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  headerTitle: {
-    ...theme.typography.headline,
-    fontSize: 20,
-    color: theme.colors.text,
-  },
-  seeAll: {
-    ...theme.typography.body,
-    color: theme.colors.accent,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  cardWrapper: {
-    width: CARD_WIDTH,
-  },
-})
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    section: {
+      marginBottom: 8,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      marginBottom: 12,
+    },
+    headerTitle: {
+      ...typography.headline,
+      fontSize: 20,
+      color: colors.text,
+    },
+    seeAll: {
+      ...typography.body,
+      color: colors.accent,
+    },
+    scrollContent: {
+      paddingHorizontal: 16,
+      gap: 12,
+    },
+    cardWrapper: {
+      width: CARD_WIDTH,
+    },
+    clusterBadge: {
+      position: 'absolute',
+      top: spacing.sm,
+      right: spacing.sm,
+      backgroundColor: colors.accent,
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    clusterText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
+  })
+}

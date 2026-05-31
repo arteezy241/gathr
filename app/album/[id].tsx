@@ -1,16 +1,27 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list'
-import { type Album, getAlbum, getAlbumAssetIds } from '@/lib/db'
-import { type MediaLibraryAsset } from '@/lib/mediaLibrary'
-import { useGalleryStore } from '@/store/galleryStore'
+import { type Album, getAlbum, getAlbumAssetIds, updateAlbumCover, addAssetsToAlbum } from '@/lib/db'
+import { Asset, type MediaLibraryAsset } from '@/lib/mediaLibrary'
 import { useSelectionStore } from '@/store/selectionStore'
 import { useBiometricAuth } from '@/features/private-albums/hooks/useBiometricAuth'
 import { PhotoThumb } from '@/features/gallery/components/PhotoThumb'
+import { useTheme } from '@/lib/themeContext'
+import { radius, typography, type ThemeColors } from '@/lib/theme'
+import { PhotoPickerModal } from '@/features/albums/components/PhotoPickerModal'
+import { ScrollIndicator } from '@/components/ui/ScrollIndicator'
 
 const NUM_COLUMNS = 3
-const THUMB_SIZE = Math.floor(Dimensions.get('window').width / NUM_COLUMNS)
+const SCREEN_WIDTH = Dimensions.get('window').width
+const THUMB_SIZE = Math.floor(SCREEN_WIDTH / NUM_COLUMNS)
+
+// Android asset IDs are content URIs ending in a numeric media-store ID.
+// Higher number = more recently added to the device library.
+function numericId(assetId: string): number {
+  const m = assetId.match(/(\d+)$/)
+  return m !== null && m[1] !== undefined ? parseInt(m[1], 10) : 0
+}
 
 interface PhotoRow {
   assets: MediaLibraryAsset[]
@@ -24,29 +35,40 @@ function keyExtractor(item: PhotoRow): string {
 export default function AlbumDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
-  const allAssets = useGalleryStore((s) => s.assets)
+  const { colors } = useTheme()
   const { selectedIds, selectAll, setLastSelected } = useSelectionStore()
   const { isAuthenticated, isAuthenticating, authenticate } = useBiometricAuth()
 
   const [album, setAlbum] = useState<Album | null>(null)
+  const [albumAssets, setAlbumAssets] = useState<MediaLibraryAsset[]>([])
   const [albumAssetIds, setAlbumAssetIds] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [pickerVisible, setPickerVisible] = useState(false)
+  const [containerHeight, setContainerHeight] = useState(0)
+  const [contentHeight, setContentHeight] = useState(0)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const listRef = useRef<any>(null)
+  const scrollY = useRef(new Animated.Value(0)).current
+
+  const styles = useMemo(() => makeStyles(colors), [colors])
 
   useEffect(() => {
     let cancelled = false
     void Promise.all([getAlbum(id), getAlbumAssetIds(id)]).then(([a, ids]) => {
       if (cancelled) return
+      const sorted = [...ids].sort((x, y) => numericId(y) - numericId(x))
       setAlbum(a)
-      setAlbumAssetIds(ids)
+      setAlbumAssetIds(sorted)
+      setAlbumAssets(sorted.map((assetId) => new Asset(assetId)))
       setIsLoading(false)
+      // Silently fix the cover to always show the newest photo
+      const newestId = sorted[0]
+      if (newestId !== undefined && newestId !== a?.coverAssetId) {
+        void updateAlbumCover(id, newestId)
+      }
     })
     return () => { cancelled = true }
   }, [id])
-
-  const albumAssets = useMemo(() => {
-    const idSet = new Set(albumAssetIds)
-    return allAssets.filter((a) => idSet.has(a.id))
-  }, [allAssets, albumAssetIds])
 
   const allAssetIds = useMemo(() => albumAssets.map((a) => a.id), [albumAssets])
 
@@ -58,8 +80,24 @@ export default function AlbumDetailScreen() {
     return result
   }, [albumAssets])
 
-  function handleAddPhotos() {
-    Alert.alert('Coming Soon', 'Adding photos to albums from the gallery is coming in a future update.')
+  const currentAlbumAssetIds = useMemo(() => new Set(albumAssetIds), [albumAssetIds])
+
+  async function handlePickerConfirm(newIds: string[]): Promise<void> {
+    setPickerVisible(false)
+    if (newIds.length === 0) return
+    await addAssetsToAlbum(id, newIds)
+    setAlbumAssetIds((prev) => {
+      const merged = [...newIds, ...prev]
+      // Highest numeric ID = most recently added; keep that as cover
+      const newest = merged.sort((x, y) => numericId(y) - numericId(x))
+      const newestId = newest[0]
+      if (newestId !== undefined) {
+        void updateAlbumCover(id, newestId)
+        setAlbum((a) => a !== null ? { ...a, coverAssetId: newestId } : a)
+      }
+      return newest
+    })
+    setAlbumAssets((prev) => [...newIds.map((assetId) => new Asset(assetId)), ...prev])
   }
 
   function renderRow({ item }: ListRenderItemInfo<PhotoRow>) {
@@ -72,7 +110,7 @@ export default function AlbumDetailScreen() {
             isSelected={selectedIds.has(asset.id)}
             allAssetIds={allAssetIds}
             onPress={() => { router.push({ pathname: '/photo/[id]', params: { id: asset.id, context: 'album', contextId: id } }) }}
-            onLongPress={() => { selectAll([asset.id]); setLastSelected(asset.id) }}
+            onLongPress={() => { /* selection handled inside PhotoThumb */ }}
           />
         ))}
         {item.assets.length < NUM_COLUMNS &&
@@ -122,11 +160,17 @@ export default function AlbumDetailScreen() {
         options={{
           title: screenTitle,
           headerRight: () => (
-            <Pressable onPress={handleAddPhotos} hitSlop={8}>
+            <Pressable onPress={() => { setPickerVisible(true) }} hitSlop={8}>
               <Text style={styles.addPhotosButton}>Add Photos</Text>
             </Pressable>
           ),
         }}
+      />
+      <PhotoPickerModal
+        visible={pickerVisible}
+        excludeIds={currentAlbumAssetIds}
+        onClose={() => { setPickerVisible(false) }}
+        onConfirm={(ids) => { void handlePickerConfirm(ids) }}
       />
       {albumAssets.length === 0 ? (
         <View style={styles.centered}>
@@ -134,74 +178,105 @@ export default function AlbumDetailScreen() {
           <Text style={styles.emptyBody}>Add photos to this album using the button above.</Text>
         </View>
       ) : (
-        <FlashList
-          data={rows}
-          renderItem={renderRow}
-          keyExtractor={keyExtractor}
-          extraData={selectedIds}
-        />
+        <View
+          style={styles.listContainer}
+          onLayout={(e) => { setContainerHeight(e.nativeEvent.layout.height) }}
+        >
+          <FlashList
+            ref={listRef}
+            data={rows}
+            renderItem={renderRow}
+            keyExtractor={keyExtractor}
+            extraData={selectedIds}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+              { useNativeDriver: false },
+            )}
+            onContentSizeChange={(_w, h) => { setContentHeight(h) }}
+            scrollEventThrottle={32}
+          />
+          {containerHeight > 0 && contentHeight > containerHeight && (
+            <ScrollIndicator
+              scrollY={scrollY}
+              contentHeight={contentHeight}
+              viewHeight={containerHeight}
+              onSeek={(offset) => {
+                listRef.current?.scrollToOffset({ offset, animated: false })
+              }}
+            />
+          )}
+        </View>
       )}
     </>
   )
 }
 
-const styles = StyleSheet.create({
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  row: {
-    flexDirection: 'row',
-  },
-  thumbPlaceholder: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-  },
-  addPhotosButton: {
-    fontSize: 16,
-    color: '#007AFF',
-  },
-  lockEmoji: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  lockedTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 8,
-  },
-  lockedBody: {
-    fontSize: 15,
-    color: '#8E8E93',
-    textAlign: 'center',
-    marginBottom: 28,
-  },
-  unlockButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  unlockButtonDisabled: {
-    backgroundColor: '#A8A8AD',
-  },
-  unlockButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 8,
-  },
-  emptyBody: {
-    fontSize: 15,
-    color: '#8E8E93',
-    textAlign: 'center',
-  },
-})
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    centered: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 32,
+      backgroundColor: colors.background,
+    },
+    listContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    row: {
+      flexDirection: 'row',
+      backgroundColor: colors.background,
+    },
+    thumbPlaceholder: {
+      width: THUMB_SIZE,
+      height: THUMB_SIZE,
+      backgroundColor: colors.background,
+    },
+    addPhotosButton: {
+      fontSize: 16,
+      color: colors.accent,
+    },
+    lockEmoji: {
+      fontSize: 48,
+      marginBottom: 16,
+    },
+    lockedTitle: {
+      ...typography.title,
+      fontSize: 20,
+      color: colors.text,
+      marginBottom: 8,
+    },
+    lockedBody: {
+      ...typography.body,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: 28,
+    },
+    unlockButton: {
+      backgroundColor: colors.accent,
+      paddingHorizontal: 28,
+      paddingVertical: 14,
+      borderRadius: radius.md,
+    },
+    unlockButtonDisabled: {
+      backgroundColor: colors.border,
+    },
+    unlockButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    emptyTitle: {
+      ...typography.title,
+      fontSize: 20,
+      color: colors.text,
+      marginBottom: 8,
+    },
+    emptyBody: {
+      ...typography.body,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+  })
+}

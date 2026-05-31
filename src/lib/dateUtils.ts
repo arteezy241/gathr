@@ -66,14 +66,26 @@ interface Resolved {
   ms: number
 }
 
+// Module-level cache — avoids re-fetching creation time for the same asset across re-renders
+const creationTimeCache = new Map<string, number>()
+
 async function resolveTimestamps(assets: MediaLibraryAsset[]): Promise<Resolved[]> {
-  const pairs = await Promise.all(
-    assets.map(async (asset) => {
-      const ms = await asset.getCreationTime()
-      return { asset, ms: ms ?? 0 }
-    }),
-  )
-  return pairs
+  // Split into already-cached and uncached
+  const uncached = assets.filter((a) => !creationTimeCache.has(a.id))
+
+  // Fetch uncached in small batches to avoid flooding the native bridge
+  const BATCH = 20
+  for (let i = 0; i < uncached.length; i += BATCH) {
+    const batch = uncached.slice(i, i + BATCH)
+    await Promise.all(
+      batch.map(async (asset) => {
+        const ms = await asset.getCreationTime()
+        creationTimeCache.set(asset.id, ms ?? 0)
+      }),
+    )
+  }
+
+  return assets.map((asset) => ({ asset, ms: creationTimeCache.get(asset.id) ?? 0 }))
 }
 
 export async function groupAssetsByDate(assets: MediaLibraryAsset[]): Promise<AssetDateGroup[]> {

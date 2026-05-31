@@ -2,16 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Stack, useRouter } from 'expo-router'
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { type StoredTrip } from '@/lib/db'
-import { impactMedium } from '@/lib/haptics'
+import { hapticDone } from '@/lib/haptics'
 import { useGalleryStore } from '@/store/galleryStore'
 import { useTripStore } from '@/store/tripStore'
 import { TripCard } from '@/features/gallery/components/TripCard'
 import { useTheme } from '@/lib/themeContext'
+import { PILL_HEIGHT, PILL_MARGIN_BOTTOM } from '@/components/ui/FloatingTabBar'
 import { radius, spacing, typography, type ThemeColors } from '@/lib/theme'
 
 export default function TripsScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { colors } = useTheme()
   const { trips, isLoading, loadTrips, detectAndSaveTrips } = useTripStore()
   const assets = useGalleryStore((s) => s.assets)
@@ -19,7 +22,8 @@ export default function TripsScreen() {
   const [query, setQuery] = useState('')
   const mountedRef = useRef(true)
 
-  const styles = useMemo(() => makeStyles(colors), [colors])
+  const bottomPad = insets.bottom + PILL_MARGIN_BOTTOM + PILL_HEIGHT + 8
+  const styles = useMemo(() => makeStyles(colors, insets.top, bottomPad), [colors, insets.top, bottomPad])
 
   useEffect(() => {
     mountedRef.current = true
@@ -30,7 +34,7 @@ export default function TripsScreen() {
     if (isRegrouping || assets.length === 0) return
     setIsRegrouping(true)
     await detectAndSaveTrips(assets)
-    await impactMedium()
+    await hapticDone()
     if (mountedRef.current) setIsRegrouping(false)
   }, [isRegrouping, assets, detectAndSaveTrips])
 
@@ -71,62 +75,65 @@ export default function TripsScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: 'Trips & Events',
-          headerRight: () =>
-            isRegrouping ? (
-              <ActivityIndicator style={styles.headerSpinner} />
-            ) : (
-              <Pressable
-                onPress={() => { void handleRegroup() }}
-                hitSlop={8}
-                disabled={assets.length === 0}
-              >
-                <Text style={[styles.regroupButton, assets.length === 0 && styles.regroupButtonDisabled]}>
-                  Regroup
-                </Text>
-              </Pressable>
-            ),
-        }}
-      />
-
-      {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.accent} />
-        </View>
-      ) : trips.length === 0 ? (
-        <View style={styles.centered}>
-          <Text style={styles.emptyTitle}>No trips detected yet</Text>
-          <Text style={styles.emptyBody}>
-            Gathr groups your photos automatically after you take a burst of photos over multiple days
-          </Text>
-        </View>
-      ) : (
-        <FlashList
-          data={filteredTrips}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          ListHeaderComponent={
-            <TextInput
-              style={styles.searchBar}
-              placeholder="Search trips…"
-              placeholderTextColor={colors.textTertiary}
-              value={query}
-              onChangeText={setQuery}
-              clearButtonMode="while-editing"
-              autoCorrect={false}
-            />
-          }
-          contentContainerStyle={styles.listContent}
-        />
-      )}
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={styles.screen}>
+        {isLoading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
+        ) : trips.length === 0 ? (
+          <View style={styles.centered}>
+            <Text style={styles.emptyTitle}>No trips detected yet</Text>
+            <Text style={styles.emptyBody}>
+              Gathr groups your photos automatically after you take a burst of photos over multiple days
+            </Text>
+          </View>
+        ) : (
+          <FlashList
+            data={filteredTrips}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            ListHeaderComponent={
+              <View style={styles.listHeader}>
+                <View style={styles.titleRow}>
+                  <Text style={styles.screenTitle}>Trips & Events</Text>
+                  <Pressable
+                    onPress={() => { void handleRegroup() }}
+                    hitSlop={8}
+                    disabled={assets.length === 0 || isRegrouping}
+                  >
+                    {isRegrouping
+                      ? <ActivityIndicator color={colors.accent} />
+                      : <Text style={[styles.regroupButton, assets.length === 0 && styles.regroupButtonDisabled]}>Regroup</Text>
+                    }
+                  </Pressable>
+                </View>
+                <TextInput
+                  style={styles.searchBar}
+                  placeholder="Search trips…"
+                  placeholderTextColor={colors.textTertiary}
+                  value={query}
+                  onChangeText={setQuery}
+                  clearButtonMode="while-editing"
+                  autoCorrect={false}
+                />
+              </View>
+            }
+            contentContainerStyle={styles.listContent}
+          />
+        )}
+      </View>
     </>
   )
 }
 
-function makeStyles(colors: ThemeColors) {
+function makeStyles(colors: ThemeColors, topPad: number, bottomPad: number) {
   return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.background,
+      paddingTop: topPad,
+    },
     centered: {
       flex: 1,
       alignItems: 'center',
@@ -147,8 +154,23 @@ function makeStyles(colors: ThemeColors) {
       textAlign: 'center',
       lineHeight: 20,
     },
+    listHeader: {
+      padding: spacing.md,
+      paddingBottom: 0,
+    },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.sm,
+    },
+    screenTitle: {
+      ...typography.headline,
+      color: colors.text,
+    },
     listContent: {
       padding: spacing.md,
+      paddingBottom: bottomPad,
     },
     searchBar: {
       marginBottom: spacing.md,
@@ -168,9 +190,6 @@ function makeStyles(colors: ThemeColors) {
     },
     regroupButtonDisabled: {
       color: colors.textTertiary,
-    },
-    headerSpinner: {
-      marginRight: 4,
     },
   })
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { addListener, removeAllListeners } from 'expo-media-library'
 import { getPhotosByDate } from '@/lib/mediaLibrary'
 import { useGalleryStore } from '@/store/galleryStore'
 
@@ -57,6 +58,17 @@ export function useGallery(): GalleryResult {
 
   useEffect(() => {
     void fetchPage(undefined, true)
+  }, [fetchPage])
+
+  // Reload the first page whenever the device media library changes (new photo taken, deleted, etc.)
+  useEffect(() => {
+    const sub = addListener(() => {
+      void fetchPage(undefined, true)
+    })
+    return () => {
+      sub.remove()
+      removeAllListeners()
+    }
   }, [fetchPage])
 
   const loadMore = useCallback(async () => {

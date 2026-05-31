@@ -1,18 +1,21 @@
-import { type ReactElement, useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
+import { type ReactElement, useCallback, useEffect, useRef, useMemo, useState } from 'react'
+import { ActivityIndicator, PanResponder, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list'
 import { type MediaLibraryAsset } from '@/lib/mediaLibrary'
 import { groupAssetsByDate } from '@/lib/dateUtils'
-import { impactMedium } from '@/lib/haptics'
 import { useGallery } from '@/features/gallery/hooks/useGallery'
 import { useSelectionStore } from '@/store/selectionStore'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { useTheme } from '@/lib/themeContext'
+import { hapticToggle } from '@/lib/haptics'
 import { DateSectionHeader } from './DateSectionHeader'
 import { PhotoThumb, THUMB_SIZE } from './PhotoThumb'
 
 const NUM_COLUMNS = 3
 const SKELETON_COUNT = 12
+const ROW_HEIGHT = THUMB_SIZE + 2   // photo row: thumb + 2px gap
+const HEADER_HEIGHT = 36            // date header approx height
 
 interface HeaderItem {
   type: 'header'
@@ -41,14 +44,84 @@ function getItemType(item: ListItem): string {
 
 interface Props {
   listHeader?: ReactElement
+  contentBottomPad?: number
 }
 
-export function PhotoGrid({ listHeader }: Props) {
+export function PhotoGrid({ listHeader, contentBottomPad }: Props) {
   const router = useRouter()
+  const { colors } = useTheme()
   const { assets, isLoading, error, hasNextPage, loadMore } = useGallery()
-  const { selectedIds, isSelecting, selectAll } = useSelectionStore()
+  const { selectedIds, isSelecting, toggleSelect, setLastSelected } = useSelectionStore()
 
   const [listData, setListData] = useState<ListItem[]>([])
+
+  // ── Drag-to-select ───────────────────────────────────────────────────────
+  const isSelectingRef = useRef(isSelecting)
+  const selectedIdsRef = useRef(selectedIds)
+  const listDataRef = useRef<ListItem[]>([])
+  const scrollOffsetRef = useRef(0)
+  const listTopRef = useRef(0)
+  const listHeaderHeightRef = useRef(0)
+  const dragModeRef = useRef<'select' | 'deselect'>('select')
+  const draggedRef = useRef(new Set<string>())
+
+  useEffect(() => { isSelectingRef.current = isSelecting }, [isSelecting])
+  useEffect(() => { selectedIdsRef.current = selectedIds }, [selectedIds])
+  useEffect(() => { listDataRef.current = listData }, [listData])
+
+  function getAssetAt(pageX: number, pageY: number): MediaLibraryAsset | null {
+    // relY = position within the FlashList scroll content (0 = top of content)
+    const relY = pageY - listTopRef.current + scrollOffsetRef.current
+    // listData items start after the ListHeaderComponent
+    const itemRelY = relY - listHeaderHeightRef.current
+    if (itemRelY < 0) return null
+    let cumY = 0
+    for (const item of listDataRef.current) {
+      const h = item.type === 'header' ? HEADER_HEIGHT : ROW_HEIGHT
+      if (itemRelY < cumY + h) {
+        if (item.type !== 'photo') return null
+        const col = Math.floor(pageX / ((THUMB_SIZE + 2)))
+        if (col < 0 || col >= NUM_COLUMNS) return null
+        return item.assets[col] ?? null
+      }
+      cumY += h
+    }
+    return null
+  }
+
+  const panResponder = useRef(PanResponder.create({
+    // Only activate when already in selection mode — long-press fires first unimpeded
+    onMoveShouldSetPanResponder: () => isSelectingRef.current,
+    onPanResponderGrant: (e) => {
+      draggedRef.current = new Set()
+      const asset = getAssetAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
+      if (!asset) return
+      dragModeRef.current = selectedIdsRef.current.has(asset.id) ? 'deselect' : 'select'
+      // toggle the first item touched
+      if (!draggedRef.current.has(asset.id)) {
+        draggedRef.current.add(asset.id)
+        useSelectionStore.getState().toggleSelect(asset.id)
+        useSelectionStore.getState().setLastSelected(asset.id)
+        hapticToggle()
+      }
+    },
+    onPanResponderMove: (e) => {
+      const asset = getAssetAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
+      if (!asset || draggedRef.current.has(asset.id)) return
+      const alreadySelected = selectedIdsRef.current.has(asset.id)
+      if (dragModeRef.current === 'select' && !alreadySelected) {
+        draggedRef.current.add(asset.id)
+        useSelectionStore.getState().toggleSelect(asset.id)
+        useSelectionStore.getState().setLastSelected(asset.id)
+        hapticToggle()
+      } else if (dragModeRef.current === 'deselect' && alreadySelected) {
+        draggedRef.current.add(asset.id)
+        useSelectionStore.getState().toggleSelect(asset.id)
+        useSelectionStore.getState().setLastSelected(asset.id)
+        hapticToggle()
+      }
+    },
+  })).current
 
   useEffect(() => {
     if (assets.length === 0) {
@@ -76,32 +149,26 @@ export function PhotoGrid({ listHeader }: Props) {
       }
       setListData(flat)
     })
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [assets])
 
   const selectedIdsSnapshot = useMemo(() => selectedIds, [selectedIds])
   const allAssetIds = useMemo(() => assets.map((a) => a.id), [assets])
 
-  function handlePress(asset: MediaLibraryAsset) {
-    router.push({ pathname: '/photo/[id]', params: { id: asset.id, context: 'gallery' } })
-  }
-
-  function handleLongPress(asset: MediaLibraryAsset) {
-    void impactMedium()
-    if (!isSelecting) {
-      selectAll([asset.id])
+  const handlePress = useCallback((asset: MediaLibraryAsset) => {
+    if (isSelecting) {
+      toggleSelect(asset.id)
+      setLastSelected(asset.id)
+    } else {
+      router.push({ pathname: '/photo/[id]', params: { id: asset.id, context: 'gallery' } })
     }
-  }
+  }, [isSelecting, toggleSelect, setLastSelected, router])
 
-  function handleEndReached() {
-    if (hasNextPage) {
-      void loadMore()
-    }
-  }
+  const handleEndReached = useCallback(() => {
+    if (hasNextPage) void loadMore()
+  }, [hasNextPage, loadMore])
 
-  function renderItem({ item }: ListRenderItemInfo<ListItem>) {
+  const renderItem = useCallback(({ item }: ListRenderItemInfo<ListItem>) => {
     if (item.type === 'header') {
       const isAllSelected =
         item.assetIds.length > 0 && item.assetIds.every((id) => selectedIdsSnapshot.has(id))
@@ -127,7 +194,7 @@ export function PhotoGrid({ listHeader }: Props) {
             isSelected={selectedIdsSnapshot.has(asset.id)}
             allAssetIds={allAssetIds}
             onPress={() => { handlePress(asset) }}
-            onLongPress={() => { handleLongPress(asset) }}
+            onLongPress={() => {}}
           />
         ))}
         {item.assets.length < NUM_COLUMNS &&
@@ -136,7 +203,7 @@ export function PhotoGrid({ listHeader }: Props) {
           ))}
       </View>
     )
-  }
+  }, [selectedIdsSnapshot, allAssetIds, handlePress])
 
   if (isLoading && assets.length === 0) {
     const skeletonRows = Array.from({ length: Math.ceil(SKELETON_COUNT / NUM_COLUMNS) })
@@ -145,11 +212,7 @@ export function PhotoGrid({ listHeader }: Props) {
         {skeletonRows.map((_, rowIndex) => (
           <View key={rowIndex} style={styles.row}>
             {Array.from({ length: NUM_COLUMNS }).map((__, colIndex) => (
-              <Skeleton
-                key={colIndex}
-                width={THUMB_SIZE}
-                height={THUMB_SIZE}
-              />
+              <Skeleton key={colIndex} width={THUMB_SIZE} height={THUMB_SIZE} />
             ))}
           </View>
         ))}
@@ -160,33 +223,52 @@ export function PhotoGrid({ listHeader }: Props) {
   if (error !== null) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.errorText}>{error}</Text>
+        <Text style={{ color: colors.accentRed, textAlign: 'center' }}>{error}</Text>
       </View>
     )
   }
 
   return (
-    <FlashList
-      data={listData}
-      renderItem={renderItem}
-      keyExtractor={keyExtractor}
-      getItemType={getItemType}
-      numColumns={1}
-      ListHeaderComponent={listHeader}
-      onEndReached={handleEndReached}
-      onEndReachedThreshold={0.5}
-      ListEmptyComponent={
-        isLoading ? null : (
-          <View style={styles.centered}>
-            <Text style={styles.emptyText}>No photos found</Text>
-          </View>
-        )
-      }
-      ListFooterComponent={
-        isLoading && assets.length > 0 ? <ActivityIndicator style={styles.footer} /> : null
-      }
-      extraData={selectedIdsSnapshot}
-    />
+    <View
+      style={{ flex: 1 }}
+      onLayout={(e) => {
+        e.target.measure((_x, _y, _w, _h, _px, py) => { listTopRef.current = py })
+      }}
+      {...(isSelecting ? panResponder.panHandlers : {})}
+    >
+      <FlashList
+        data={listData}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        getItemType={getItemType}
+        numColumns={1}
+        ListHeaderComponent={
+          listHeader !== undefined ? (
+            <View onLayout={(e) => { listHeaderHeightRef.current = e.nativeEvent.layout.height }}>
+              {listHeader}
+            </View>
+          ) : undefined
+        }
+        contentContainerStyle={contentBottomPad !== undefined ? { paddingBottom: contentBottomPad } : undefined}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.5}
+        onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y }}
+        scrollEventThrottle={16}
+        ListEmptyComponent={
+          isLoading ? null : (
+            <View style={styles.centered}>
+              <Text style={{ color: colors.textTertiary, textAlign: 'center' }}>No photos found</Text>
+            </View>
+          )
+        }
+        ListFooterComponent={
+          isLoading && assets.length > 0
+            ? <ActivityIndicator style={styles.footer} color={colors.accent} />
+            : null
+        }
+        extraData={selectedIdsSnapshot}
+      />
+    </View>
   )
 }
 
@@ -208,14 +290,6 @@ const styles = StyleSheet.create({
   thumbPlaceholder: {
     width: THUMB_SIZE,
     height: THUMB_SIZE,
-  },
-  errorText: {
-    color: '#FF3B30',
-    textAlign: 'center',
-  },
-  emptyText: {
-    color: '#8E8E93',
-    textAlign: 'center',
   },
   footer: {
     paddingVertical: 16,
