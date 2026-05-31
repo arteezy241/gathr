@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
-import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list'
+import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list'
 import { type Album, getAlbum, getAlbumAssetIds, updateAlbumCover, addAssetsToAlbum } from '@/lib/db'
 import { Asset, type MediaLibraryAsset } from '@/lib/mediaLibrary'
 import { useSelectionStore } from '@/store/selectionStore'
@@ -46,7 +46,7 @@ export default function AlbumDetailScreen() {
   const [pickerVisible, setPickerVisible] = useState(false)
   const [containerHeight, setContainerHeight] = useState(0)
   const [contentHeight, setContentHeight] = useState(0)
-  const listRef = useRef<{ scrollToOffset: (params: { offset: number; animated: boolean }) => void } | null>(null)
+  const listRef = useRef<FlashListRef<PhotoRow> | null>(null)
   const scrollY = useRef(new Animated.Value(0)).current
 
   const styles = useMemo(() => makeStyles(colors), [colors])

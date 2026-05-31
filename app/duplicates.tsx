@@ -164,7 +164,7 @@ export default function DuplicatesScreen() {
             <Ionicons name="search-outline" size={48} color={colors.accent} />
             <Text style={styles.emptyTitle}>Scanning…</Text>
             <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${String(Math.round(scanProgress))}%` }]} />
+              <View style={[styles.progressFill, { width: `${String(Math.round(scanProgress))}%` as `${number}%` }]} />
             </View>
             <Text style={styles.progressLabel}>{String(Math.round(scanProgress))}%</Text>
           </View>

@@ -359,8 +359,8 @@ function VideoPlayerReady({ uri, onTap }: { uri: string; onTap: () => void }) {
                 {...scrubberPan.panHandlers}
               >
                 <View style={styles.scrubberBg} />
-                <View style={[styles.scrubberFill, { width: `${String(Math.round(progress * 100))}%` }]} />
-                <View style={[styles.scrubberThumb, { left: `${String(Math.round(progress * 100))}%` }]} />
+                <View style={[styles.scrubberFill, { width: `${String(Math.round(progress * 100))}%` as `${number}%` }]} />
+                <View style={[styles.scrubberThumb, { left: `${String(Math.round(progress * 100))}%` as `${number}%` }]} />
               </View>
               <Text style={styles.scrubberTime}>{fmt(duration)}</Text>
             </View>
