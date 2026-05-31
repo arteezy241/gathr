@@ -12,6 +12,7 @@ interface GalleryState {
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   setPagination: (hasNextPage: boolean, endCursor: string | undefined) => void
+  removeAssets: (ids: string[]) => void
 }
 
 export const useGalleryStore = create<GalleryState>((set) => ({
@@ -39,6 +40,11 @@ export const useGalleryStore = create<GalleryState>((set) => ({
 
   setPagination: (hasNextPage, endCursor) => {
     set({ hasNextPage, endCursor })
+  },
+
+  removeAssets: (ids) => {
+    const idSet = new Set(ids)
+    set((state) => ({ assets: state.assets.filter((a) => !idSet.has(a.id)) }))
   },
 }))
 

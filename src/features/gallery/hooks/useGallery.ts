@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { getPhotosByDate } from '@/lib/mediaLibrary'
+import { addListener, removeAllListeners, getPhotosByDate } from '@/lib/mediaLibrary'
 import { useGalleryStore } from '@/store/galleryStore'
 
 const PAGE_SIZE = 100
@@ -57,6 +57,17 @@ export function useGallery(): GalleryResult {
 
   useEffect(() => {
     void fetchPage(undefined, true)
+  }, [fetchPage])
+
+  // Reload the first page whenever the device media library changes (new photo taken, deleted, etc.)
+  useEffect(() => {
+    const sub = addListener(() => {
+      void fetchPage(undefined, true)
+    })
+    return () => {
+      sub.remove()
+      removeAllListeners()
+    }
   }, [fetchPage])
 
   const loadMore = useCallback(async () => {

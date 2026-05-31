@@ -9,6 +9,9 @@ import { useGalleryStore } from '@/store/galleryStore'
 import { useSelectionStore } from '@/store/selectionStore'
 import { PhotoThumb } from '@/features/gallery/components/PhotoThumb'
 import { SelectionBar } from '@/features/gallery/components/SelectionBar'
+import { useTheme } from '@/lib/themeContext'
+import { type ThemeColors } from '@/lib/theme'
+import { GlassView } from '@/components/ui/GlassView'
 
 const NUM_COLUMNS = 3
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -39,12 +42,15 @@ function keyExtractor(item: PhotoRow): string {
 export default function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
+  const { colors } = useTheme()
   const allAssets = useGalleryStore((s) => s.assets)
   const { selectedIds, isSelecting, selectAll, setLastSelected } = useSelectionStore()
 
   const [trip, setTrip] = useState<StoredTrip | null>(null)
   const [isLoadingTrip, setIsLoadingTrip] = useState(true)
   const [tripAssets, setTripAssets] = useState<MediaLibraryAsset[]>([])
+
+  const styles = useMemo(() => makeStyles(colors), [colors])
 
   useEffect(() => {
     let cancelled = false
@@ -123,10 +129,11 @@ export default function TripDetailScreen() {
             style={styles.heroImage}
             contentFit="cover"
             recyclingKey={trip.coverAssetId}
+            transition={300}
           />
-          <View style={styles.heroOverlay}>
+          <GlassView intensity={45} tint="dark" style={styles.heroOverlay}>
             <Text style={styles.heroSubtitle}>{trip.subtitle}</Text>
-          </View>
+          </GlassView>
         </View>
         <View style={styles.metaRow}>
           <Text style={styles.metaText}>
@@ -148,12 +155,7 @@ export default function TripDetailScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: screenTitle,
-          headerBackTitle: 'Back',
-        }}
-      />
+      <Stack.Screen options={{ title: screenTitle, headerBackTitle: 'Back' }} />
       <View style={styles.screen}>
         <FlashList
           data={rows}
@@ -169,48 +171,52 @@ export default function TripDetailScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  centered: {
-    flex: 1,
-  },
-  hero: {
-    width: SCREEN_WIDTH,
-    height: HERO_HEIGHT,
-  },
-  heroImage: {
-    width: SCREEN_WIDTH,
-    height: HERO_HEIGHT,
-  },
-  heroOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  heroSubtitle: {
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: '500',
-  },
-  metaRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  metaText: {
-    fontSize: 14,
-    color: '#8E8E93',
-  },
-  row: {
-    flexDirection: 'row',
-  },
-  thumbPlaceholder: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-  },
-})
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    centered: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    hero: {
+      width: SCREEN_WIDTH,
+      height: HERO_HEIGHT,
+    },
+    heroImage: {
+      width: SCREEN_WIDTH,
+      height: HERO_HEIGHT,
+    },
+    heroOverlay: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      overflow: 'hidden',
+    },
+    heroSubtitle: {
+      fontSize: 15,
+      color: 'rgba(255,255,255,0.9)',
+      fontWeight: '500',
+    },
+    metaRow: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    metaText: {
+      fontSize: 14,
+      color: colors.textTertiary,
+    },
+    row: {
+      flexDirection: 'row',
+    },
+    thumbPlaceholder: {
+      width: THUMB_SIZE,
+      height: THUMB_SIZE,
+    },
+  })
+}

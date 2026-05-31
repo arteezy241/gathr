@@ -1,4 +1,10 @@
+import * as Crypto from 'expo-crypto'
 import { type MediaLibraryAsset } from '@/lib/mediaLibrary'
+import { getPlaceName } from '@/lib/geocoding'
+
+function generateId(): string {
+  return Crypto.randomUUID()
+}
 
 export const GAP_THRESHOLD_HOURS = 6
 export const MIN_PHOTOS = 4
@@ -13,6 +19,7 @@ export type TripGroup = {
   durationDays: number
   photoCount: number
   coverAsset: MediaLibraryAsset
+  place: string | null
 }
 
 const MS_PER_HOUR = 1000 * 60 * 60
@@ -38,12 +45,12 @@ function durationDays(start: Date, end: Date): number {
   return endDay - startDay
 }
 
-function buildLabel(start: Date, end: Date, days: number): string {
+function buildLabel(start: Date, end: Date, days: number, place: string | null): string {
   if (days === 0) {
     const dayName = DAY_NAMES[start.getDay()] ?? 'Day'
-    return `${dayName} Adventure`
+    return place !== null ? place : `${dayName} Adventure`
   }
-  return `Trip · ${formatDateRange(start, end)}`
+  return place !== null ? `${place} · ${formatDateRange(start, end)}` : `Trip · ${formatDateRange(start, end)}`
 }
 
 function buildSubtitle(days: number, photoCount: number): string {
@@ -106,9 +113,20 @@ export async function groupAssetsIntoTrips(assets: MediaLibraryAsset[]): Promise
     if (midEntry === undefined) continue
     const coverAsset = midEntry.asset
 
+    // Attempt reverse geocoding from EXIF coordinates — no GPS permission required
+    let place: string | null = null
+    try {
+      const loc = await coverAsset.getLocation()
+      if (loc !== null) {
+        place = await getPlaceName(loc.latitude, loc.longitude)
+      }
+    } catch {
+      // Location unavailable — continue without place name
+    }
+
     trips.push({
-      id: crypto.randomUUID(),
-      label: buildLabel(startDate, endDate, days),
+      id: generateId(),
+      label: buildLabel(startDate, endDate, days, place),
       subtitle: buildSubtitle(days, photoCount),
       assets: group.map((e) => e.asset),
       startDate,
@@ -116,6 +134,7 @@ export async function groupAssetsIntoTrips(assets: MediaLibraryAsset[]): Promise
       durationDays: days,
       photoCount,
       coverAsset,
+      place,
     })
   }
 

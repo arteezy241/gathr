@@ -1,5 +1,10 @@
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite'
+import * as Crypto from 'expo-crypto'
 import { type TripGroup } from '@/lib/tripGrouper'
+
+function generateId(): string {
+  return Crypto.randomUUID()
+}
 
 export type Album = {
   id: string
@@ -33,6 +38,7 @@ export type StoredTrip = {
   photoCount: number
   durationDays: number
   createdAt: number
+  place: string | null
 }
 
 interface TripRow {
@@ -45,6 +51,7 @@ interface TripRow {
   photo_count: number
   duration_days: number
   created_at: number
+  place: string | null
 }
 
 let _db: SQLiteDatabase | null = null
@@ -101,12 +108,28 @@ export async function initDb(): Promise<void> {
       PRIMARY KEY (album_id, asset_id),
       FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS favorites (
+      asset_id TEXT PRIMARY KEY,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS trip_album_dismissed (
+      trip_id TEXT PRIMARY KEY,
+      dismissed_at INTEGER NOT NULL
+    );
   `)
+  // Add place column if upgrading from an older schema
+  try {
+    await db.execAsync('ALTER TABLE trips ADD COLUMN place TEXT;')
+  } catch {
+    // Column already exists — ignore
+  }
 }
 
 export async function createAlbum(name: string, isPrivate: boolean): Promise<string> {
   const db = await getDb()
-  const id = crypto.randomUUID()
+  const id = generateId()
   const now = Date.now()
   await db.runAsync(
     'INSERT INTO albums (id, name, is_private, cover_asset_id, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?)',
@@ -196,19 +219,21 @@ function rowToStoredTrip(row: TripRow): StoredTrip {
     photoCount: row.photo_count,
     durationDays: row.duration_days,
     createdAt: row.created_at,
+    place: row.place ?? null,
   }
 }
 
 export async function saveTrips(trips: TripGroup[]): Promise<void> {
-  if (trips.length === 0) return
   const db = await getDb()
   const now = Date.now()
   await db.withExclusiveTransactionAsync(async (txn) => {
+    // Full refresh — clear then re-insert so re-grouping never produces duplicates
+    await txn.runAsync('DELETE FROM trips', [])
     for (const trip of trips) {
       await txn.runAsync(
-        `INSERT OR REPLACE INTO trips
-          (id, label, subtitle, start_date, end_date, cover_asset_id, photo_count, duration_days, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO trips
+          (id, label, subtitle, start_date, end_date, cover_asset_id, photo_count, duration_days, created_at, place)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           trip.id,
           trip.label,
@@ -219,6 +244,7 @@ export async function saveTrips(trips: TripGroup[]): Promise<void> {
           trip.photoCount,
           trip.durationDays,
           now,
+          trip.place ?? null,
         ],
       )
     }
@@ -240,4 +266,40 @@ export async function getTrip(id: string): Promise<StoredTrip | null> {
 export async function clearTrips(): Promise<void> {
   const db = await getDb()
   await db.runAsync('DELETE FROM trips', [])
+}
+
+export async function getFavoriteIds(): Promise<string[]> {
+  const db = await getDb()
+  const rows = await db.getAllAsync<{ asset_id: string }>(
+    'SELECT asset_id FROM favorites ORDER BY created_at DESC',
+    [],
+  )
+  return rows.map((r) => r.asset_id)
+}
+
+export async function addFavorite(assetId: string): Promise<void> {
+  const db = await getDb()
+  await db.runAsync(
+    'INSERT OR IGNORE INTO favorites (asset_id, created_at) VALUES (?, ?)',
+    [assetId, Date.now()],
+  )
+}
+
+export async function removeFavorite(assetId: string): Promise<void> {
+  const db = await getDb()
+  await db.runAsync('DELETE FROM favorites WHERE asset_id = ?', [assetId])
+}
+
+export async function getDismissedTripIds(): Promise<Set<string>> {
+  const db = await getDb()
+  const rows = await db.getAllAsync<{ trip_id: string }>('SELECT trip_id FROM trip_album_dismissed', [])
+  return new Set(rows.map((r) => r.trip_id))
+}
+
+export async function dismissTripSuggestion(tripId: string): Promise<void> {
+  const db = await getDb()
+  await db.runAsync(
+    'INSERT OR IGNORE INTO trip_album_dismissed (trip_id, dismissed_at) VALUES (?, ?)',
+    [tripId, Date.now()],
+  )
 }

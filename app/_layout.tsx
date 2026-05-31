@@ -1,7 +1,38 @@
 import { useEffect } from 'react'
+import { Platform } from 'react-native'
 import { Stack } from 'expo-router'
+import { StatusBar } from 'expo-status-bar'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { initDb } from '@/lib/db'
+import { ThemeProvider, useTheme } from '@/lib/themeContext'
+
+function AppStack() {
+  const { isDark, colors } = useTheme()
+
+  return (
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.text,
+          headerTitleStyle: { color: colors.text, fontWeight: '600' },
+          headerShadowVisible: false,
+          // iOS: blurred glass header matching theme
+          headerBlurEffect: isDark ? 'dark' : 'light',
+          headerTransparent: Platform.OS === 'ios',
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="camera" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="duplicates" options={{ title: 'Similar Photos', presentation: 'modal' }} />
+        <Stack.Screen name="memory/[id]" options={{ title: 'Memory' }} />
+      </Stack>
+    </>
+  )
+}
 
 export default function RootLayout() {
   useEffect(() => {
@@ -9,8 +40,12 @@ export default function RootLayout() {
   }, [])
 
   return (
-    <SafeAreaProvider>
-      <Stack />
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
+        <SafeAreaProvider>
+          <AppStack />
+        </SafeAreaProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   )
 }
