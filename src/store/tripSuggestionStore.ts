@@ -18,7 +18,7 @@ type Actions = {
   dismiss: (tripId: string) => Promise<void>
 }
 
-export const useTripSuggestionStore = create<State & Actions>((set, get) => ({
+export const useTripSuggestionStore = create<State & Actions>((set) => ({
   suggestions: [],
   saving: null,
 

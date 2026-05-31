@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useAlbumStore } from '@/store/albumStore'
 import { generateKey, saveEncryptionKey } from '@/lib/secureStore'
-import { hapticSuccess, hapticSoft } from '@/lib/haptics'
+import { hapticSuccess } from '@/lib/haptics'
 import { useTheme } from '@/lib/themeContext'
 import { GlassView } from '@/components/ui/GlassView'
 import { radius, spacing, typography, type ThemeColors } from '@/lib/theme'

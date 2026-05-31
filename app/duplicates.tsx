@@ -13,7 +13,7 @@ import { Stack } from 'expo-router'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { type Asset } from 'expo-media-library/next'
+import { type MediaLibraryAsset as Asset } from '@/lib/mediaLibrary'
 import { useDuplicateStore } from '@/store/duplicateStore'
 import { type DuplicateGroup } from '@/lib/duplicateDetector'
 import { useTheme } from '@/lib/themeContext'
@@ -164,7 +164,7 @@ export default function DuplicatesScreen() {
             <Ionicons name="search-outline" size={48} color={colors.accent} />
             <Text style={styles.emptyTitle}>Scanning…</Text>
             <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${Math.round(scanProgress)}%` as `${number}%` }]} />
+              <View style={[styles.progressFill, { width: `${String(Math.round(scanProgress))}%` }]} />
             </View>
             <Text style={styles.progressLabel}>{String(Math.round(scanProgress))}%</Text>
           </View>

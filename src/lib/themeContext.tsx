@@ -17,7 +17,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const system = useColorScheme()
   const [override, setOverride] = useState<'dark' | 'light' | null>(null)
 
-  const isDark = (override ?? system ?? 'dark') !== 'light'
+  const isDark = (override ?? system) !== 'light'
   const colors = isDark ? darkColors : lightColors
 
   const toggle = useCallback(() => {

@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useGalleryStore } from '@/store/galleryStore'
 import { useTheme } from '@/lib/themeContext'
-import { radius, spacing, typography, type ThemeColors } from '@/lib/theme'
+import { spacing, typography, type ThemeColors } from '@/lib/theme'
 
 const NUM_COLS = 3
 const GAP = 2
@@ -47,7 +47,8 @@ export function PhotoPickerModal({ visible, excludeIds, onClose, onConfirm }: Pr
   function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }

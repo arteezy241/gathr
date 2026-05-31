@@ -18,13 +18,13 @@ import {
   useMicrophonePermissions,
   type FlashMode,
   type CameraMode,
-  type CameraRatio,
+  type CameraView as CameraViewType,
 } from 'expo-camera'
-import type { CameraView as CameraViewType } from 'expo-camera'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { GestureDetector, Gesture } from 'react-native-gesture-handler'
-import { useSharedValue, runOnJS } from 'react-native-reanimated'
+import { useSharedValue } from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAlbumStore } from '@/store/albumStore'
 import { createAsset } from '@/lib/mediaLibrary'
@@ -63,7 +63,7 @@ function zoomLevelToValue(level: ZoomLevel): number {
 const BURST_COUNT = 5
 const BURST_DELAY_MS = 250
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
+const { width: SCREEN_W } = Dimensions.get('window')
 
 // ─── Grid overlay ─────────────────────────────────────────────────────────────
 
@@ -100,7 +100,7 @@ function FocusRing({ x, y, opacity }: { x: number; y: number; opacity: Animated.
         Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
       ]),
     ]).start()
-  }, [x, y]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [x, y])
   return (
     <Animated.View
       style={[
@@ -137,7 +137,7 @@ function TimerOverlay({ count }: { count: number }) {
         Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }),
       ]),
     ]).start()
-  }, [count]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [count])
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <View style={timerStyles.center}>
@@ -273,7 +273,7 @@ export default function CameraScreen() {
       if (videoSettleRef.current !== null) clearTimeout(videoSettleRef.current)
     }
     return () => { if (videoSettleRef.current !== null) clearTimeout(videoSettleRef.current) }
-  }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode])
 
   // ── Pinch-to-zoom ────────────────────────────────────────────────────────────
   const baseZoom = useSharedValue(0)
@@ -297,12 +297,12 @@ export default function CameraScreen() {
       const delta = (e.scale - 1) * 0.08
       const next = Math.max(0, Math.min(1, baseZoom.value + delta))
       currentZoom.value = next
-      runOnJS(applyZoom)(next)
+      scheduleOnRN(applyZoom, next)
     })
 
   // ── Tap to focus ─────────────────────────────────────────────────────────────
   const tapGesture = Gesture.Tap().onEnd((e) => {
-    runOnJS(handleTapFocus)(e.x, e.y)
+    scheduleOnRN(handleTapFocus, e.x, e.y)
   })
 
   function handleTapFocus(x: number, y: number) {
@@ -402,7 +402,8 @@ export default function CameraScreen() {
     }
     if (selectedAlbumId !== null && assetIds.length > 0) {
       await addAssetsToAlbum(selectedAlbumId, assetIds)
-      await updateAlbumCover(selectedAlbumId, assetIds[assetIds.length - 1]!)
+      const lastId = assetIds[assetIds.length - 1]
+      if (lastId !== undefined) await updateAlbumCover(selectedAlbumId, lastId)
     }
     hapticSuccess()
     setBurstCount(0)
@@ -591,7 +592,7 @@ export default function CameraScreen() {
             barcodeScannerSettings={mode === 'scan' ? { barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'pdf417', 'aztec', 'datamatrix'] } : undefined}
             onBarcodeScanned={mode === 'scan' ? (result) => { setScanResult(result.data) } : undefined}
             {...(selectedLens !== undefined ? { selectedLens } : {})}
-            {...(Platform.OS === 'android' ? { ratio: '4:3' as CameraRatio } : {})}
+            {...(Platform.OS === 'android' ? { ratio: '4:3' } : {})}
           />
           {showGrid && <GridOverlay />}
           {focusPoint !== null && (

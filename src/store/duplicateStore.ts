@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { type DuplicateGroup, scanForDuplicates } from '@/lib/duplicateDetector'
-import { deleteAssets } from '@/lib/mediaLibrary'
-import { type Asset } from 'expo-media-library/next'
+import { deleteAssets, type MediaLibraryAsset as Asset } from '@/lib/mediaLibrary'
 
 type DuplicateState = {
   groups: DuplicateGroup[]

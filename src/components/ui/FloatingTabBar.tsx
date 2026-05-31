@@ -23,7 +23,7 @@ interface TabBarProps {
 export const PILL_HEIGHT = 56
 export const PILL_MARGIN_BOTTOM = 10
 
-export function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
+export function FloatingTabBar({ state, navigation }: TabBarProps) {
   const { colors, isDark, toggle } = useTheme()
   const insets = useSafeAreaInsets()
   const router = useRouter()
@@ -102,7 +102,6 @@ export function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) 
                 const iconName = icons
                   ? (focused ? icons.active : icons.inactive)
                   : 'images'
-                const label = descriptors[route.key]?.options.title ?? route.name
 
                 return (
                   <Pressable

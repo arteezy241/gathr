@@ -126,11 +126,9 @@ export default function AlbumsScreen() {
     if (sortKey === 'name') copy.sort((a, b) => a.name.localeCompare(b.name))
     else if (sortKey === 'newest') copy.sort((a, b) => b.createdAt - a.createdAt)
     else if (sortKey === 'oldest') copy.sort((a, b) => a.createdAt - b.createdAt)
-    else if (sortKey === 'count') copy.sort((a, b) => (assetCounts[b.id] ?? 0) - (assetCounts[a.id] ?? 0))
+    else copy.sort((a, b) => (assetCounts[b.id] ?? 0) - (assetCounts[a.id] ?? 0))
     return copy
   }, [albums, query, sortKey, assetCounts])
-
-  const sortLabel: Record<string, string> = { name: 'A–Z', newest: 'Newest', oldest: 'Oldest', count: 'Size' }
 
   const rows: AlbumRow[] = []
   for (let i = 0; i < sortedAlbums.length; i += 2) {

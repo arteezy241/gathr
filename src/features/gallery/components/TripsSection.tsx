@@ -38,7 +38,8 @@ function clusterByPlace(trips: StoredTrip[]): TripCluster[] {
   // Place clusters — show most recent trip as representative
   for (const group of placeMap.values()) {
     const sorted = [...group].sort((a, b) => b.startDate - a.startDate)
-    clusters.push({ representativeTrip: sorted[0]!, count: group.length })
+    const rep = sorted[0]
+    if (rep !== undefined) clusters.push({ representativeTrip: rep, count: group.length })
   }
 
   // Ungrouped trips (no location data)

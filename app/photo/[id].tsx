@@ -5,7 +5,6 @@ import {
   Animated,
   Dimensions,
   FlatList,
-  InteractionManager,
   PanResponder,
   Platform,
   Pressable,
@@ -19,9 +18,8 @@ import Reanimated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
-  runOnJS,
 } from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
@@ -32,7 +30,7 @@ import { BlurView } from 'expo-blur'
 import { getAlbumAssetIds, getTrip, removeAssetsFromAlbum, updateAlbumCover } from '@/lib/db'
 import { shareAsset } from '@/lib/sharing'
 import { deleteAssets, createAsset } from '@/lib/mediaLibrary'
-import { manipulateAsync, FlipType, SaveFormat } from 'expo-image-manipulator'
+import { ImageManipulator, FlipType, SaveFormat } from 'expo-image-manipulator'
 import { useGalleryStore } from '@/store/galleryStore'
 import { useAlbumStore } from '@/store/albumStore'
 import { useFavoriteStore } from '@/store/favoriteStore'
@@ -108,7 +106,7 @@ function PhotoPage({ item, onSingleTap, onZoomChange }: PhotoPageProps) {
       const nowZoomed = next > 1.05
       if (nowZoomed !== isZoomedShared.value) {
         isZoomedShared.value = nowZoomed
-        runOnJS(handleZoomChange)(nowZoomed)
+        scheduleOnRN(handleZoomChange, nowZoomed)
       }
     })
     .onEnd(() => {
@@ -121,7 +119,7 @@ function PhotoPage({ item, onSingleTap, onZoomChange }: PhotoPageProps) {
         savedTranslateY.value = 0
         if (isZoomedShared.value) {
           isZoomedShared.value = false
-          runOnJS(handleZoomChange)(false)
+          scheduleOnRN(handleZoomChange, false)
         }
       } else {
         savedScale.value = scale.value
@@ -157,7 +155,7 @@ function PhotoPage({ item, onSingleTap, onZoomChange }: PhotoPageProps) {
         savedTranslateX.value = 0
         savedTranslateY.value = 0
         isZoomedShared.value = false
-        runOnJS(handleZoomChange)(false)
+        scheduleOnRN(handleZoomChange, false)
       } else {
         // Zoom in centered on tap
         const targetScale = ZOOM_IN_SCALE
@@ -173,14 +171,14 @@ function PhotoPage({ item, onSingleTap, onZoomChange }: PhotoPageProps) {
         savedTranslateX.value = clamped.x
         savedTranslateY.value = clamped.y
         isZoomedShared.value = true
-        runOnJS(handleZoomChange)(true)
+        scheduleOnRN(handleZoomChange, true)
       }
     })
 
   const singleTap = Gesture.Tap()
     .numberOfTaps(1)
     .onEnd(() => {
-      runOnJS(onSingleTap)()
+      scheduleOnRN(onSingleTap)
     })
 
   // Double tap takes priority over single tap
@@ -275,14 +273,14 @@ function VideoPlayerReady({ uri, onTap }: { uri: string; onTap: () => void }) {
         setIsPlaying(playing)
       }),
     ]
-    return () => subs.forEach((s) => s.remove())
+    return () => { subs.forEach((s) => { s.remove() }) }
   }, [player])
 
   // Poll currentTime while playing, stop when paused
   useEffect(() => {
     if (!isPlaying) return
     const id = setInterval(() => { setCurrentTime(player.currentTime) }, 250)
-    return () => clearInterval(id)
+    return () => { clearInterval(id) }
   }, [player, isPlaying])
 
   useEffect(() => {
@@ -306,7 +304,7 @@ function VideoPlayerReady({ uri, onTap }: { uri: string; onTap: () => void }) {
   function fmt(s: number) {
     const m = Math.floor(s / 60)
     const sec = Math.floor(s % 60)
-    return `${m}:${String(sec).padStart(2, '0')}`
+    return `${String(m)}:${String(sec).padStart(2, '0')}`
   }
 
   const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0
@@ -361,8 +359,8 @@ function VideoPlayerReady({ uri, onTap }: { uri: string; onTap: () => void }) {
                 {...scrubberPan.panHandlers}
               >
                 <View style={styles.scrubberBg} />
-                <View style={[styles.scrubberFill, { width: `${Math.round(progress * 100)}%` }]} />
-                <View style={[styles.scrubberThumb, { left: `${Math.round(progress * 100)}%` }]} />
+                <View style={[styles.scrubberFill, { width: `${String(Math.round(progress * 100))}%` }]} />
+                <View style={[styles.scrubberThumb, { left: `${String(Math.round(progress * 100))}%` }]} />
               </View>
               <Text style={styles.scrubberTime}>{fmt(duration)}</Text>
             </View>
@@ -402,8 +400,8 @@ function toPhotoContext(value: string | undefined): PhotoContext | undefined {
 
 function memoryDateRange(memoryId: string): { startMs: number; endMs: number } | null {
   const match = /onthisday-(\d{4})/.exec(memoryId)
-  if (match === null) return null
-  const year = parseInt(match[1]!, 10)
+  if (match === null || match[1] === undefined) return null
+  const year = parseInt(match[1], 10)
   const now = new Date()
   const m = now.getMonth()
   const d = now.getDate()
@@ -511,11 +509,11 @@ export default function PhotoDetailScreen() {
 
   // Defer DB loads until after the screen transition finishes
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
+    const id = setTimeout(() => {
       void loadFavorites()
       void loadAlbums()
-    })
-    return () => task.cancel()
+    }, 50)
+    return () => { clearTimeout(id) }
   }, [loadFavorites, loadAlbums])
 
   // ── Build context asset list ─────────────────────────────────────────────
@@ -654,11 +652,17 @@ export default function PhotoDetailScreen() {
     }
   }
 
-  async function applyEdit(actions: Parameters<typeof manipulateAsync>[1]): Promise<void> {
+  async function applyEdit(actions: Array<{ rotate: number } | { flip: FlipType }>): Promise<void> {
     if (currentAsset === null) return
     try {
       const uri = await currentAsset.getUri()
-      const result = await manipulateAsync(uri, actions, { format: SaveFormat.JPEG, compress: 0.92 })
+      let ctx = ImageManipulator.manipulate(uri)
+      for (const action of actions) {
+        if ('rotate' in action) ctx = ctx.rotate(action.rotate)
+        else ctx = ctx.flip(action.flip)
+      }
+      const ref = await ctx.renderAsync()
+      const result = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.92 })
       await createAsset(result.uri)
     } catch (e) {
       Alert.alert('Edit Failed', e instanceof Error ? e.message : 'Could not apply edit.')

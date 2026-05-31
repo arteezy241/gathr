@@ -5,8 +5,7 @@ import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useMemoriesStore } from '@/store/memoriesStore'
-import { getPhotosByDateRange } from '@/lib/mediaLibrary'
-import { type Asset } from 'expo-media-library/next'
+import { getPhotosByDateRange, type MediaLibraryAsset as Asset } from '@/lib/mediaLibrary'
 import { useTheme } from '@/lib/themeContext'
 import { typography, type ThemeColors } from '@/lib/theme'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -23,7 +22,8 @@ function assetUri(asset: Asset): string {
 /** Parse the target year from the memory id (format: "onthisday-YYYY"). */
 function parseYear(id: string): number | null {
   const match = /onthisday-(\d{4})/.exec(id)
-  return match !== null ? parseInt(match[1]!, 10) : null
+  if (match === null || match[1] === undefined) return null
+  return parseInt(match[1], 10)
 }
 
 function startOfDay(year: number, month: number, day: number): number {
@@ -48,7 +48,7 @@ export default function MemoryScreen() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const year = parseYear(id ?? '')
+    const year = parseYear(id)
     if (year === null) { setIsLoading(false); return }
 
     const now = new Date()

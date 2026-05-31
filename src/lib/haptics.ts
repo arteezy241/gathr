@@ -20,52 +20,62 @@ function notify(type: Haptics.NotificationFeedbackType) {
 
 // Light tap — photo thumb press, minor button
 export function hapticTap() {
-  isAndroid ? android(AndroidHaptics.Virtual_Key) : impact(Impact.Light)
+  if (isAndroid) android(AndroidHaptics.Virtual_Key)
+  else impact(Impact.Light)
 }
 
 // Entering selection mode via long press
 export function hapticSelect() {
-  isAndroid ? android(AndroidHaptics.Long_Press) : impact(Impact.Medium)
+  if (isAndroid) android(AndroidHaptics.Long_Press)
+  else impact(Impact.Medium)
 }
 
 // Toggle checkbox on/off — crisp click
 export function hapticToggle() {
-  isAndroid ? android(AndroidHaptics.Clock_Tick) : impact(Impact.Rigid)
+  if (isAndroid) android(AndroidHaptics.Clock_Tick)
+  else impact(Impact.Rigid)
 }
 
 // Swipe between photos — subtle tick
 export function hapticTick() {
-  isAndroid ? android(AndroidHaptics.Clock_Tick) : void Haptics.selectionAsync()
+  if (isAndroid) android(AndroidHaptics.Clock_Tick)
+  else void Haptics.selectionAsync()
 }
 
 // Sheet / modal open or close
 export function hapticSoft() {
-  isAndroid ? android(AndroidHaptics.Virtual_Key) : impact(Impact.Soft)
+  if (isAndroid) android(AndroidHaptics.Virtual_Key)
+  else impact(Impact.Soft)
 }
 
 // Segmented control / tab switch / dark mode toggle
 export function hapticSwitch() {
-  isAndroid ? android(AndroidHaptics.Toggle_On) : impact(Impact.Rigid)
+  if (isAndroid) android(AndroidHaptics.Toggle_On)
+  else impact(Impact.Rigid)
 }
 
 // FAB / primary action button
 export function hapticAction() {
-  isAndroid ? android(AndroidHaptics.Context_Click) : impact(Impact.Medium)
+  if (isAndroid) android(AndroidHaptics.Context_Click)
+  else impact(Impact.Medium)
 }
 
 // Success: album created, photos added, favorite saved
 export function hapticSuccess() {
-  isAndroid ? android(AndroidHaptics.Confirm) : notify(Notify.Success)
+  if (isAndroid) android(AndroidHaptics.Confirm)
+  else notify(Notify.Success)
 }
 
 // Warning: about to delete
 export function hapticWarning() {
-  isAndroid ? android(AndroidHaptics.Reject) : notify(Notify.Warning)
+  if (isAndroid) android(AndroidHaptics.Reject)
+  else notify(Notify.Warning)
 }
 
 // Error: something failed
 export function hapticError() {
-  isAndroid ? android(AndroidHaptics.Reject) : notify(Notify.Error)
+  if (isAndroid) android(AndroidHaptics.Reject)
+  else notify(Notify.Error)
 }
 
 // Delete confirmed — heavy double-pulse for destructive weight

@@ -1,4 +1,4 @@
-import { Album } from 'expo-media-library/next'
+import { Album } from '@/lib/mediaLibrary'
 import { initDb, createAlbum, addAssetsToAlbum, updateAlbumCover, getAlbums as getGathrAlbums } from '@/lib/db'
 
 const SKIP_TITLES = new Set([
@@ -20,11 +20,6 @@ export async function importNativeAlbums(
 
   const existing = await getGathrAlbums()
   const existingNames = new Set(existing.map((a) => a.name.toLowerCase()))
-
-  const eligible = nativeAlbums.filter((a) => {
-    const title = a.id // We'll resolve titles below — filter happens after
-    return true
-  })
 
   let imported = 0
   let skipped = 0

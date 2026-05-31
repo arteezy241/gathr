@@ -4,6 +4,7 @@
  */
 import {
   Asset,
+  Album,
   type PermissionResponse,
   Query,
   AssetField,
@@ -11,12 +12,22 @@ import {
   requestPermissionsAsync,
   getPermissionsAsync,
 } from 'expo-media-library/next'
+import {
+  addListener as _addListener,
+  removeAllListeners as _removeAllListeners,
+  type MediaLibraryAssetsChangeEvent,
+} from 'expo-media-library'
 
 export type { PermissionResponse }
-export { Asset, MediaType }
+export { Asset, Album, MediaType }
+export const addListener = _addListener
+export const removeAllListeners = _removeAllListeners
+export type { MediaLibraryAssetsChangeEvent }
 
 /** Stable public alias for the expo-media-library Asset type. */
 export type MediaLibraryAsset = Asset
+
+
 
 export async function requestPermissions(): Promise<PermissionResponse> {
   return requestPermissionsAsync()

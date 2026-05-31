@@ -58,7 +58,7 @@ export default function GalleryScreen() {
   }
 
   const bottomPad = insets.bottom + PILL_MARGIN_BOTTOM + PILL_HEIGHT + 8
-  const styles = useMemo(() => makeStyles(colors, insets.top, bottomPad), [colors, insets.top, bottomPad])
+  const styles = useMemo(() => makeStyles(colors, insets.top), [colors, insets.top])
 
   useEffect(() => {
     if (assets.length > 0 && lastGroupedAt === null) {
@@ -156,7 +156,7 @@ export default function GalleryScreen() {
   )
 }
 
-function makeStyles(colors: ThemeColors, topPad: number, _bottomPad: number) {
+function makeStyles(colors: ThemeColors, topPad: number) {
   return StyleSheet.create({
     screen: {
       flex: 1,

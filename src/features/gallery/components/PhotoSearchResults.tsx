@@ -1,16 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list'
-import { type MediaLibraryAsset } from '@/lib/mediaLibrary'
-import { getPhotosByDateRange } from '@/lib/mediaLibrary'
+import { type MediaLibraryAsset, getPhotosByDateRange } from '@/lib/mediaLibrary'
 import { useTheme } from '@/lib/themeContext'
 import { PhotoThumb, THUMB_SIZE } from './PhotoThumb'
 import { useSelectionStore } from '@/store/selectionStore'
-import { useMemo } from 'react'
 
 const NUM_COLUMNS = 3
-const ROW_HEIGHT = THUMB_SIZE + 2
 
 interface PhotoRow {
   assets: MediaLibraryAsset[]

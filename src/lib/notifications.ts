@@ -3,21 +3,22 @@ import { Platform } from 'react-native'
 
 // Show notification even when app is in foreground
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: () =>
+    Promise.resolve({
+      shouldShowAlert: true,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
 })
 
 export async function requestNotificationPermission(): Promise<boolean> {
   if (Platform.OS === 'web') return false
   const { status: existing } = await Notifications.getPermissionsAsync()
-  if (existing === 'granted') return true
+  if (existing === Notifications.PermissionStatus.GRANTED) return true
   const { status } = await Notifications.requestPermissionsAsync()
-  return status === 'granted'
+  return status === Notifications.PermissionStatus.GRANTED
 }
 
 /**

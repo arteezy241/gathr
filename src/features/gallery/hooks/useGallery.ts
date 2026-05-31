@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { addListener, removeAllListeners } from 'expo-media-library'
-import { getPhotosByDate } from '@/lib/mediaLibrary'
+import { addListener, removeAllListeners, getPhotosByDate } from '@/lib/mediaLibrary'
 import { useGalleryStore } from '@/store/galleryStore'
 
 const PAGE_SIZE = 100

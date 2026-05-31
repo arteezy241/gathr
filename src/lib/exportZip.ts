@@ -37,7 +37,9 @@ export async function exportAssetsAsZip(
   // Phase 1: read each asset as base64 then convert to bytes
   for (let i = 0; i < assets.length; i++) {
     onProgress?.({ current: i + 1, total, phase: 'reading' })
-    const uri = await assets[i]!.getUri()
+    const asset = assets[i]
+    if (asset === undefined) continue
+    const uri = await asset.getUri()
     const b64 = await readAsStringAsync(uri, { encoding: EncodingType.Base64 })
     const ext = uri.split('.').pop()?.toLowerCase() ?? 'jpg'
     const filename = `photo_${String(i + 1).padStart(3, '0')}.${ext}`

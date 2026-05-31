@@ -1,5 +1,4 @@
-import { getRecentPhotos } from '@/lib/mediaLibrary'
-import { type Asset } from 'expo-media-library/next'
+import { getRecentPhotos, type MediaLibraryAsset as Asset } from '@/lib/mediaLibrary'
 
 /** Max photos to scan in one pass — keeps it under ~3s on mid-range devices. */
 const SCAN_LIMIT = 600
@@ -57,12 +56,15 @@ export async function scanForDuplicates(
   let groupSeq = 0
 
   while (i < timed.length) {
-    const windowStart = timed[i]!
+    const windowStart = timed[i]
+    if (windowStart === undefined) break
     const cluster: TimedAsset[] = [windowStart]
     let j = i + 1
 
-    while (j < timed.length && timed[j]!.ms - windowStart.ms <= BURST_WINDOW_MS) {
-      cluster.push(timed[j]!)
+    while (j < timed.length) {
+      const next = timed[j]
+      if (next === undefined || next.ms - windowStart.ms > BURST_WINDOW_MS) break
+      cluster.push(next)
       j++
     }
 

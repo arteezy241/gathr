@@ -36,7 +36,7 @@ export default function AlbumDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const { colors } = useTheme()
-  const { selectedIds, selectAll, setLastSelected } = useSelectionStore()
+  const { selectedIds } = useSelectionStore()
   const { isAuthenticated, isAuthenticating, authenticate } = useBiometricAuth()
 
   const [album, setAlbum] = useState<Album | null>(null)
@@ -46,8 +46,7 @@ export default function AlbumDetailScreen() {
   const [pickerVisible, setPickerVisible] = useState(false)
   const [containerHeight, setContainerHeight] = useState(0)
   const [contentHeight, setContentHeight] = useState(0)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const listRef = useRef<any>(null)
+  const listRef = useRef<{ scrollToOffset: (params: { offset: number; animated: boolean }) => void } | null>(null)
   const scrollY = useRef(new Animated.Value(0)).current
 
   const styles = useMemo(() => makeStyles(colors), [colors])

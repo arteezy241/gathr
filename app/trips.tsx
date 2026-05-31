@@ -30,7 +30,7 @@ export default function TripsScreen() {
     if (isRegrouping || assets.length === 0) return
     setIsRegrouping(true)
     await detectAndSaveTrips(assets)
-    await impactMedium()
+    impactMedium()
     if (mountedRef.current) setIsRegrouping(false)
   }, [isRegrouping, assets, detectAndSaveTrips])
 

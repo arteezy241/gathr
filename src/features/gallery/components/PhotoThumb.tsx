@@ -63,7 +63,7 @@ function PhotoPeekModal({ asset, uri, isVideo, onClose, onOpen, onSelect }: Prev
       Animated.timing(backdropOpacity, { toValue: 0, duration: 140, useNativeDriver: true }),
       Animated.timing(cardScale, { toValue: 0.92, duration: 130, useNativeDriver: true }),
       Animated.timing(cardOpacity, { toValue: 0, duration: 130, useNativeDriver: true }),
-    ]).start(() => cb())
+    ]).start(() => { cb() })
   }
 
   return (
@@ -118,7 +118,7 @@ function PhotoPeekModal({ asset, uri, isVideo, onClose, onOpen, onSelect }: Prev
   )
 }
 
-export const PhotoThumb = memo(function PhotoThumb({ asset, isSelected, allAssetIds: _allAssetIds, onPress, onLongPress: _onLongPress }: Props) {
+export const PhotoThumb = memo(function PhotoThumb({ asset, isSelected, onPress }: Props) {
   const { colors } = useTheme()
   const isSelecting = useSelectionStore((s) => s.isSelecting)
   const toggleSelect = useSelectionStore((s) => s.toggleSelect)

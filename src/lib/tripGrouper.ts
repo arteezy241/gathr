@@ -48,7 +48,7 @@ function durationDays(start: Date, end: Date): number {
 function buildLabel(start: Date, end: Date, days: number, place: string | null): string {
   if (days === 0) {
     const dayName = DAY_NAMES[start.getDay()] ?? 'Day'
-    return place !== null ? `${place}` : `${dayName} Adventure`
+    return place !== null ? place : `${dayName} Adventure`
   }
   return place !== null ? `${place} · ${formatDateRange(start, end)}` : `Trip · ${formatDateRange(start, end)}`
 }
