@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Animated, Dimensions, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list'
 import { type Album, getAlbum, getAlbumAssetIds, updateAlbumCover, addAssetsToAlbum } from '@/lib/db'
