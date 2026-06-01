@@ -19,7 +19,6 @@ import { markOnboardingComplete } from '@/lib/onboarding'
 import { radius, spacing, typography } from '@/lib/theme'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
-const SLIDE_COUNT = 4
 const SLIDES = [0, 1, 2, 3]
 const MOSAIC_OUTER = SCREEN_WIDTH - 2 * 40
 const CELL_SIZE = Math.floor((MOSAIC_OUTER - 2 * 6) / 3)
@@ -45,7 +44,7 @@ function TripsIllustration({ stroke }: { stroke: string }) {
         stroke={stroke} strokeWidth="2.5" fill="none" strokeLinejoin="round"
       />
       {/* Calendar rect inside pin */}
-      <Rect x="46" y="33" width="28" height="22" rx="3" stroke={stroke} strokeWidth="2" fill="none" />
+      <Rect transform={{ translateX: 46, translateY: 33 }} width="28" height="22" rx="3" stroke={stroke} strokeWidth="2" fill="none" />
       {/* Calendar header line + pin rings */}
       <Line x1="46" y1="40" x2="74" y2="40" stroke={stroke} strokeWidth="2" />
     </Svg>
@@ -61,7 +60,7 @@ function LockIllustration({ stroke }: { stroke: string }) {
         stroke={stroke} strokeWidth="2.5" fill="none" strokeLinecap="round"
       />
       {/* Body */}
-      <Rect x="32" y="60" width="56" height="46" rx="8" stroke={stroke} strokeWidth="2.5" fill="none" />
+      <Rect transform={{ translateX: 32, translateY: 60 }} width="56" height="46" rx="8" stroke={stroke} strokeWidth="2.5" fill="none" />
       {/* Keyhole */}
       <Circle cx="60" cy="82" r="6" stroke={stroke} strokeWidth="2.5" fill="none" />
       <Line x1="60" y1="88" x2="60" y2="96" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" />

@@ -17,7 +17,7 @@ import { AlbumsEmptyState } from '@/features/albums/components/AlbumsEmptyState'
 import { PermissionsEmptyState } from '@/components/ui/PermissionsEmptyState'
 import { useTheme } from '@/lib/themeContext'
 import { usePermissions } from '@/hooks/usePermissions'
-import { radius, spacing, typography, type ThemeColors } from '@/lib/theme'
+import { radius, spacing, type ThemeColors } from '@/lib/theme'
 
 const GAP = 10
 const HORIZONTAL_PAD = 16

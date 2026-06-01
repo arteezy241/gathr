@@ -20,7 +20,6 @@ function AppStack() {
       if (!done) router.replace('/onboarding')
       setReady(true)
     })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: colors.background }} />
