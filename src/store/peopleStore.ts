@@ -52,7 +52,7 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
       .map((c) => ({
         id: c.id,
         name: c.name,
-        coverAssetId: c.cover_asset_id!,
+        coverAssetId: c.cover_asset_id ?? '',
         photoCount: c.photo_count,
       }))
     const lastRaw = await SecureStore.getItemAsync(LAST_SCANNED_KEY)
@@ -122,7 +122,7 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
         .map((c) => ({
           id: c.id,
           name: c.name,
-          coverAssetId: c.cover_asset_id!,
+          coverAssetId: c.cover_asset_id ?? '',
           photoCount: c.photo_count,
         }))
 

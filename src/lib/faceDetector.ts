@@ -40,12 +40,12 @@ function flattenLandmarks(landmarks: Landmarks, bx: number, by: number, bw: numb
   return pts
 }
 
-export async function detectFacesInAsset(assetUri: string): Promise<DetectedFace[]> {
-  if (!assetUri) return []
+export function detectFacesInAsset(assetUri: string): Promise<DetectedFace[]> {
+  if (!assetUri) return Promise.resolve([])
   try {
     const detector = getDetector()
     const faces = detector.detectFaces({ uri: assetUri })
-    return faces
+    const results = faces
       .map((face) => {
         const { x: bx, y: by, width: bw, height: bh } = face.bounds
         if (!face.landmarks) return null
@@ -54,7 +54,8 @@ export async function detectFacesInAsset(assetUri: string): Promise<DetectedFace
         return { embedding: pts, bbox: { x: bx, y: by, w: bw, h: bh } }
       })
       .filter((f): f is DetectedFace => f !== null)
+    return Promise.resolve(results)
   } catch {
-    return []
+    return Promise.resolve([])
   }
 }

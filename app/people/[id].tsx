@@ -81,7 +81,7 @@ export default function PersonDetailScreen() {
         'Rename Person',
         undefined,
         (text) => {
-          if (text !== undefined && text.trim().length > 0) {
+          if (text.trim().length > 0) {
             void renamePerson(id, text.trim())
           }
         },

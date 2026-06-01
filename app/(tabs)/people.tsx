@@ -166,11 +166,7 @@ export default function PeopleScreen() {
 
   // Load clusters on first render if we have a previous scan
   useEffect(() => {
-    if (lastScannedAt !== null && clusters.length === 0) {
-      void loadClusters()
-    }
-    // Run once on mount; lastScannedAt is read from store on init
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void loadClusters()
   }, [])
 
   return (

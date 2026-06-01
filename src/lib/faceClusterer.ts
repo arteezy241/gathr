@@ -78,9 +78,10 @@ export async function runClustering(): Promise<void> {
       embeddingAssignments.push({ id: emb.id, clusterId: newId })
     } else {
       // Assign to existing cluster, update centroid as running average
-      const existing = clusterUpdates.get(bestClusterId)!
+      const existing = clusterUpdates.get(bestClusterId)
+      if (existing === undefined) continue
       const newCount = existing.photo_count + 1
-      const oldCentroid = clusterCentroids.get(bestClusterId)!
+      const oldCentroid = clusterCentroids.get(bestClusterId) ?? vec
       const newCentroid = updateCentroid(oldCentroid, vec, newCount)
       clusterCentroids.set(bestClusterId, newCentroid)
 
