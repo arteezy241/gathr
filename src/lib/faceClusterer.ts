@@ -61,7 +61,7 @@ export async function runClustering(): Promise<void> {
     let bestDist = FACE_CLUSTER_THRESHOLD
 
     for (const [cid, centroid] of clusterCentroids.entries()) {
-      if (centroid.length !== EMBEDDING_LENGTH || vec.length !== EMBEDDING_LENGTH) continue
+      if (centroid.length !== EMBEDDING_LENGTH) continue
       const dist = euclideanDistance(centroid, vec)
       if (dist < bestDist) {
         bestDist = dist

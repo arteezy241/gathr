@@ -1,6 +1,6 @@
 import { Platform } from 'react-native'
 import FaceDetection from '@react-native-ml-kit/face-detection'
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import type { TfliteModel, TensorflowModelDelegate } from 'react-native-fast-tflite'
 import * as jpeg from 'jpeg-js'
 
@@ -24,7 +24,9 @@ function getModel(): Promise<TfliteModel | null> {
         // Lazy require so a missing native module doesn't crash the app at import time.
         // The native module only exists after a custom dev/production build.
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { loadTensorflowModel } = require('react-native-fast-tflite') as typeof import('react-native-fast-tflite')
+        const { loadTensorflowModel } = require('react-native-fast-tflite') as {
+          loadTensorflowModel: (source: number, delegates?: TensorflowModelDelegate[]) => Promise<TfliteModel>
+        }
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const src = require('../../assets/models/mobile_face_net.tflite') as number
         const delegates: TensorflowModelDelegate[] = Platform.OS === 'ios' ? ['core-ml'] : []
@@ -32,7 +34,7 @@ function getModel(): Promise<TfliteModel | null> {
           return await loadTensorflowModel(src, delegates)
         } catch {
           // Core ML may reject some model architectures — fall back to CPU
-          return loadTensorflowModel(src, [])
+          return await loadTensorflowModel(src, [])
         }
       } catch {
         // Native module not yet compiled into this build — scan will find no faces
@@ -98,14 +100,11 @@ export async function detectFacesInAsset(assetUri: string): Promise<DetectedFace
         const cropW = bw + padX * 2
         const cropH = bh + padY * 2
 
-        const { base64 } = await manipulateAsync(
-          assetUri,
-          [
-            { crop: { originX: cropX, originY: cropY, width: cropW, height: cropH } },
-            { resize: { width: FACE_SIZE, height: FACE_SIZE } },
-          ],
-          { format: SaveFormat.JPEG, base64: true, compress: 0.92 },
-        )
+        const imageRef = await ImageManipulator.manipulate(assetUri)
+          .crop({ originX: cropX, originY: cropY, width: cropW, height: cropH })
+          .resize({ width: FACE_SIZE, height: FACE_SIZE })
+          .renderAsync()
+        const { base64 } = await imageRef.saveAsync({ format: SaveFormat.JPEG, base64: true, compress: 0.92 })
 
         if (!base64) continue
 
