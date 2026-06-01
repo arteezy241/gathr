@@ -63,6 +63,12 @@
           "color": "#0A84FF"
         }
       ],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Gathr uses the camera to take photos."
+        }
+      ]
     ],
     "extra": {
       "router": {},

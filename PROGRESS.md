@@ -187,6 +187,17 @@
 - **Tab wiring** — all three tabs show `PermissionsEmptyState` when `!requesting && !granted` (permission check takes priority); gallery passes `emptyComponent` to `PhotoGrid`; trips and albums replace their inline text empty states with the new components
 - **`react-native-svg`** added to dependencies (was assumed transitive but not present)
 
+### Phase 23 — People Tab (On-Device Face Clustering)
+- **`src/lib/faceDetector.ts`** — `detectFacesInAsset(uri)`: calls ML Kit still-image API via `react-native-vision-camera-face-detector`; flattens landmark {x,y} points and normalizes each coordinate to 0–1 relative to face bbox; returns `[]` on any error, never throws
+- **`src/lib/faceClusterer.ts`** — `runClustering()`: loads unclustered embeddings from DB, loads existing cluster centroids, greedy nearest-neighbor assignment (`FACE_CLUSTER_THRESHOLD = 0.6` Euclidean), updates centroid as running average, picks cover asset by largest bbox area; persists all in single `persistClusteringResults` transaction
+- **`src/lib/db.ts`** additions — `face_embeddings` table (id, asset_id, cluster_id, embedding JSON, bbox coords, created_at); `face_clusters` table (id, name, cover_asset_id, centroid JSON, photo_count, updated_at); exports `FaceEmbeddingRow`, `FaceClusterRow` interfaces; exports 7 helpers + `persistClusteringResults` + `hasEmbeddingForAsset`
+- **`src/store/peopleStore.ts`** — `startScan(assets)`: batch size 10, `hasEmbeddingForAsset` check skips re-scanning, yields between batches; runs clustering + reloads after all assets; persists `lastScannedAt` via `expo-secure-store`; `MIN_CLUSTER_SIZE = 3` hides noise clusters; `shouldRescan()` helper (null or >7 days old)
+- **`app/(tabs)/people.tsx`** — three states: never-scanned (SVG two-person silhouette + "Discover People" + "Scan Library" pill); scanning (progress bar reusing duplicates.tsx style, "Scanning X / Y photos", "This may take a few minutes."); results (2-column FlashList of `PersonCard`); re-scan button top-right with ActivityIndicator while scanning
+- **`PersonCard`** — square card, expo-image cover, `expo-linear-gradient` overlay bottom half (transparent → rgba(0,0,0,0.6)), name bottom-left (unnamed → "Person N" 1-indexed), count badge bottom-right, long-press → inline TextInput rename
+- **`app/people/[id].tsx`** — header with person name + pencil edit button; Alert.prompt on iOS, TextInput modal on Android; 3-column FlashList; tap photo → `/photo/[id]` with `context: 'person'` + `contextId: clusterId`
+- **`app/photo/[id].tsx`** — added `'person'` to `PhotoContext` union; `getAssetIdsForCluster(contextId)` loads asset list same pattern as album/trip contexts
+- **`FloatingTabBar`** — People added as fourth segment (icon: `people` / `people-outline`); per-segment `paddingHorizontal` reduced 14 → 10 to fit four tabs
+
 ---
 
 ## Key Architecture Decisions
@@ -218,6 +229,11 @@
 | Gallery filter reads `useTrashStore.getState()` (not subscribed) | Avoids re-rendering gallery on every trash operation; filter applies at fetch time, not on state change |
 | `galleryStore.invalidate()` / `refreshKey` | Clean decoupled signal for useGallery to refetch without trashStore knowing about the gallery |
 | `UndoToastProvider` inside `SafeAreaProvider` | Allows `useSafeAreaInsets()` inside the provider for correct bottom positioning above FloatingTabBar |
+| Landmark-based embedding vs. true semantic embedding | ML Kit still-image API provides landmark {x,y} positions only (no 128-d embedding); we flatten+normalize to 0–1 relative to face bbox. Cheaper, fully on-device, no model download, but pose/lighting-sensitive. |
+| `hasEmbeddingForAsset` check before detection | Skips re-running ML Kit on already-processed assets so re-scans are fast; clustering is always re-run on unclustered rows only |
+| `persistClusteringResults` single transaction | Cluster upserts and embedding assignments are committed atomically to prevent orphaned face_embeddings rows if the app crashes mid-clustering |
+| `MIN_CLUSTER_SIZE = 3` | Hides noise clusters from single stray face detections; only people who appear in ≥ 3 photos are shown |
+| `FACE_CLUSTER_THRESHOLD = 0.6` (Euclidean) | Empirically chosen for landmark vectors; tighter values over-split the same person, looser values merge different people |
 
 ---
 
@@ -234,17 +250,19 @@ app/
     index.tsx                   — gallery screen, search bar, GalleryHeader wiring
     trips.tsx                   — all trips list
     albums.tsx                  — albums list, create, import, sort, duplicate entry point
+    people.tsx                  — People tab: never-scanned / scanning / results states; PersonCard with long-press rename
   onboarding.tsx                — 4-slide first-launch flow: Welcome / Trips / Private / Permissions
   album/[id].tsx                — album detail, biometric gate, picker, ScrollIndicator
   trash.tsx                     — recently deleted: 3-col grid, countdown badges, peek modal, empty trash
   trip/[id].tsx                 — trip detail, hero image, photo grid
-  photo/[id].tsx                — full-screen viewer, RNGH zoom, video player, image editing
+  photo/[id].tsx                — full-screen viewer, RNGH zoom, video player, image editing; contexts: gallery/album/trip/memory/person
+  people/[id].tsx               — person detail: 3-col FlashList, editable name header, tap opens photo viewer
 
 src/
   lib/
     mediaLibrary.ts             — expo-media-library gateway
     onboarding.ts               — hasCompletedOnboarding / markOnboardingComplete via expo-secure-store
-    db.ts                       — SQLite: albums, album_assets, trips (+ place), favorites, trip_album_dismissed
+    db.ts                       — SQLite: albums, album_assets, trips (+ place), favorites, trip_album_dismissed, face_embeddings, face_clusters
     tripGrouper.ts              — time-gap grouping + reverse geocoding
     geocoding.ts                — getPlaceName via expo-location.reverseGeocodeAsync
     nativeAlbumImport.ts        — device album importer
@@ -253,6 +271,8 @@ src/
     memories.ts                 — buildMemories: on-this-day + trip memory cards
     notifications.ts            — daily 9 AM memory reminder
     duplicateDetector.ts        — burst detection via creation time clustering
+    faceDetector.ts             — detectFacesInAsset via ML Kit; returns normalized landmark embedding + bbox
+    faceClusterer.ts            — runClustering: greedy nearest-neighbor; euclideanDistance, updateCentroid
     haptics.ts                  — haptic wrappers
     dateUtils.ts                — groupAssetsByDate, creation time cache
     theme.ts                    — darkColors, lightColors, spacing, radius, typography
@@ -267,6 +287,7 @@ src/
     tripSuggestionStore.ts
     duplicateStore.ts           — scan, deleteFromGroup, dismissGroup
     trashStore.ts               — moveToTrash, restoreFromTrash, permanentlyDelete, emptyTrash, purgeExpired
+    peopleStore.ts              — startScan (batch 10, skip already-scanned), loadClusters, renamePerson, getPhotosForPerson
   components/
     ui/
       Skeleton.tsx
@@ -309,3 +330,5 @@ src/
 - `shareMultipleAssets` opens one share sheet per photo sequentially — ZIP export is the better bulk path
 - `surfaceType="textureView"` in VideoView is Android-only; silently ignored on iOS
 - Zoom tap buttons (2×/5×) are approximate — `expo-camera zoom` is 0–1 of device max zoom, which varies by device; no API to query actual max zoom ratio from JS
+- People scan time on large libraries: ~5–10 min for 1 000 photos (ML Kit inference + bridge overhead per asset)
+- Face clustering accuracy degrades with large pose/lighting variation — landmark-based embedding has no semantic understanding of identity

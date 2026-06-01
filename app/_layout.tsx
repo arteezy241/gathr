@@ -45,6 +45,7 @@ function AppStack() {
         <Stack.Screen name="duplicates" options={{ title: 'Similar Photos', presentation: 'modal' }} />
         <Stack.Screen name="trash" options={{ title: 'Recently Deleted' }} />
         <Stack.Screen name="memory/[id]" options={{ title: 'Memory' }} />
+        <Stack.Screen name="people/[id]" options={{ title: 'Person' }} />
       </Stack>
     </>
   )

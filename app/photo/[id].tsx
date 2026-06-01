@@ -27,7 +27,7 @@ import { useVideoPlayer, VideoView } from 'expo-video'
 import { Asset, type MediaLibraryAsset, MediaType, getPhotosByDateRange } from '@/lib/mediaLibrary'
 import { GlassView } from '@/components/ui/GlassView'
 import { BlurView } from 'expo-blur'
-import { getAlbumAssetIds, getTrip, removeAssetsFromAlbum, updateAlbumCover } from '@/lib/db'
+import { getAlbumAssetIds, getTrip, getAssetIdsForCluster, removeAssetsFromAlbum, updateAlbumCover } from '@/lib/db'
 import { shareAsset } from '@/lib/sharing'
 import { createAsset } from '@/lib/mediaLibrary'
 import { hapticWarning } from '@/lib/haptics'
@@ -394,10 +394,10 @@ function VideoPage({ item, onTap }: { item: MediaLibraryAsset; onTap: () => void
   return <VideoPlayerReady uri={uri} onTap={onTap} />
 }
 
-type PhotoContext = 'gallery' | 'album' | 'trip' | 'memory'
+type PhotoContext = 'gallery' | 'album' | 'trip' | 'memory' | 'person'
 
 function toPhotoContext(value: string | undefined): PhotoContext | undefined {
-  if (value === 'gallery' || value === 'album' || value === 'trip' || value === 'memory') return value
+  if (value === 'gallery' || value === 'album' || value === 'trip' || value === 'memory' || value === 'person') return value
   return undefined
 }
 
@@ -546,6 +546,9 @@ export default function PhotoDetailScreen() {
           .sort((a, b) => a.ms - b.ms)
           .map((e) => e.asset)
         setContextAssets(filtered)
+      } else if (context === 'person' && contextId !== undefined) {
+        const assetIds = await getAssetIdsForCluster(contextId)
+        setContextAssets(assetIds.map((aid) => new Asset(aid)))
       } else if (context === 'memory' && contextId !== undefined) {
         const range = memoryDateRange(contextId)
         if (range !== null) {
