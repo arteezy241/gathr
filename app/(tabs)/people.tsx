@@ -16,7 +16,6 @@ import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Path } from 'react-native-svg'
-import { useGalleryStore } from '@/store/galleryStore'
 import { usePeopleStore, shouldRescan, type PersonCluster } from '@/store/peopleStore'
 import { useTheme } from '@/lib/themeContext'
 import { radius, spacing, typography, type ThemeColors } from '@/lib/theme'
@@ -135,7 +134,6 @@ function PersonCard({ cluster, index, colors, onRename }: PersonCardProps) {
 export default function PeopleScreen() {
   const insets = useSafeAreaInsets()
   const { colors } = useTheme()
-  const allAssets = useGalleryStore((s) => s.assets)
   const { clusters, isScanning, scanProgress, lastScannedAt, startScan, renamePerson, loadClusters } =
     usePeopleStore()
   const styles = useMemo(() => makeStyles(colors), [colors])
@@ -143,7 +141,7 @@ export default function PeopleScreen() {
   const hasNeverScanned = lastScannedAt === null && !isScanning
 
   function handleStartScan() {
-    void startScan(allAssets)
+    void startScan()
   }
 
   function handleRescan() {
