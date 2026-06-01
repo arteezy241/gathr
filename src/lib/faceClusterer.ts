@@ -6,6 +6,9 @@ import {
   type FaceClusterRow,
 } from '@/lib/db'
 
+// Embeddings with LANDMARK_KEYS.length * 2 floats are valid; anything else is a corrupt row.
+const EXPECTED_EMBEDDING_LENGTH = 20
+
 export const FACE_CLUSTER_THRESHOLD = 0.6
 
 export function euclideanDistance(a: number[], b: number[]): number {
@@ -42,11 +45,16 @@ export async function runClustering(): Promise<void> {
     existingClusters.map((c) => [c.id, 0]),
   )
   const embeddingAssignments: { id: string; clusterId: string }[] = []
+  const corruptEmbeddingIds: string[] = []
 
   // 3. Greedy nearest-neighbor assignment
   for (const emb of unclustered) {
     const vec = JSON.parse(emb.embedding) as number[]
-    if (vec.length === 0) continue
+    if (vec.length !== EXPECTED_EMBEDDING_LENGTH) {
+      // Corrupt or legacy row — delete so it stops polluting future clustering passes.
+      corruptEmbeddingIds.push(emb.id)
+      continue
+    }
 
     let bestClusterId: string | null = null
     let bestDist = FACE_CLUSTER_THRESHOLD
@@ -102,5 +110,5 @@ export async function runClustering(): Promise<void> {
   }
 
   // 4. Persist all updates in a single transaction
-  await persistClusteringResults(Array.from(clusterUpdates.values()), embeddingAssignments)
+  await persistClusteringResults(Array.from(clusterUpdates.values()), embeddingAssignments, corruptEmbeddingIds)
 }
