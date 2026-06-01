@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Alert,
   Dimensions,
   Platform,
   Pressable,
@@ -76,22 +75,8 @@ export default function PersonDetailScreen() {
   const displayName = personName ?? 'Unknown Person'
 
   function startRename() {
-    if (Platform.OS === 'ios') {
-      Alert.prompt(
-        'Rename Person',
-        undefined,
-        (text) => {
-          if (text.trim().length > 0) {
-            void renamePerson(id, text.trim())
-          }
-        },
-        'plain-text',
-        personName ?? '',
-      )
-    } else {
-      setRenameText(personName ?? '')
-      setIsRenaming(true)
-    }
+    setRenameText(personName ?? '')
+    setIsRenaming(true)
   }
 
   function submitRename() {

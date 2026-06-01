@@ -24,12 +24,20 @@ export function useSelectionActions() {
   const selected = assets.filter((a) => selectedIds.has(a.id))
 
   async function handleShare(): Promise<void> {
-    if (isSharing || selected.length === 0) return
+    if (isSharing || exportProgress !== null || selected.length === 0) return
+    hapticTap()
     if (selected.length > 1) {
-      showInfo('Share Multiple Photos', 'Tap the export button to share all selected photos as a ZIP file.')
+      // Route multi-photo share through ZIP so only one share sheet appears
+      try {
+        await exportAssetsAsZip(selected, (p) => { setExportProgress(p) })
+        hapticSuccess()
+      } catch (e) {
+        showInfo('Share Failed', e instanceof Error ? e.message : 'Could not share photos.')
+      } finally {
+        setExportProgress(null)
+      }
       return
     }
-    hapticTap()
     setIsSharing(true)
     try {
       await shareMultipleAssets(selected)
