@@ -188,15 +188,16 @@
 - **`react-native-svg`** added to dependencies (was assumed transitive but not present)
 
 ### Phase 23 — People Tab (On-Device Face Clustering)
-- **`src/lib/faceDetector.ts`** — `detectFacesInAsset(uri)`: calls ML Kit still-image API via `react-native-vision-camera-face-detector`; flattens landmark {x,y} points and normalizes each coordinate to 0–1 relative to face bbox; returns `[]` on any error, never throws
-- **`src/lib/faceClusterer.ts`** — `runClustering()`: loads unclustered embeddings from DB, loads existing cluster centroids, greedy nearest-neighbor assignment (`FACE_CLUSTER_THRESHOLD = 0.6` Euclidean), updates centroid as running average, picks cover asset by largest bbox area; persists all in single `persistClusteringResults` transaction
-- **`src/lib/db.ts`** additions — `face_embeddings` table (id, asset_id, cluster_id, embedding JSON, bbox coords, created_at); `face_clusters` table (id, name, cover_asset_id, centroid JSON, photo_count, updated_at); exports `FaceEmbeddingRow`, `FaceClusterRow` interfaces; exports 7 helpers + `persistClusteringResults` + `hasEmbeddingForAsset`
-- **`src/store/peopleStore.ts`** — `startScan(assets)`: batch size 10, `hasEmbeddingForAsset` check skips re-scanning, yields between batches; runs clustering + reloads after all assets; persists `lastScannedAt` via `expo-secure-store`; `MIN_CLUSTER_SIZE = 3` hides noise clusters; `shouldRescan()` helper (null or >7 days old)
-- **`app/(tabs)/people.tsx`** — three states: never-scanned (SVG two-person silhouette + "Discover People" + "Scan Library" pill); scanning (progress bar reusing duplicates.tsx style, "Scanning X / Y photos", "This may take a few minutes."); results (2-column FlashList of `PersonCard`); re-scan button top-right with ActivityIndicator while scanning
+- **`src/lib/faceDetector.ts`** — `detectFacesInAsset(uri)`: calls ML Kit still-image API via `react-native-vision-camera-face-detector`; always emits exactly 20 floats (10 landmark keys × 2 coords) zero-padding missing landmarks so all vectors are the same length regardless of pose; returns `[]` on any error, never throws
+- **`src/lib/faceClusterer.ts`** — `runClustering()`: loads unclustered embeddings, greedy nearest-neighbor assignment (`FACE_CLUSTER_THRESHOLD = 0.6` Euclidean), running-average centroid, largest-bbox cover; corrupt/legacy rows (wrong vector length) are deleted in the same transaction so they never re-enter future passes
+- **`src/lib/db.ts`** additions — `face_embeddings` + `face_clusters` tables; `FaceEmbeddingRow`/`FaceClusterRow` interfaces; `saveFaceEmbedding`, `getEmbeddingsWithoutCluster`, `getAllClusters`, `updateEmbeddingCluster`, `upsertCluster`, `renameCluster`, `getAssetIdsForCluster`, `getScannedAssetIds`, `persistClusteringResults` (atomic transaction with corrupt-row delete), `hasEmbeddingForAsset`
+- **`src/store/peopleStore.ts`** — `startScan`: loads all scanned asset IDs into a `Set` upfront (one query) instead of N per-asset round-trips; `rawToClusters()` type-predicate helper deduplicates the filter+map in `loadClusters` and `startScan`; `MIN_CLUSTER_SIZE = 3`; `lastScannedAt` persisted via `expo-secure-store`
+- **`app/(tabs)/people.tsx`** — three states: never-scanned (SVG two-person silhouette + "Discover People" + "Scan Library" pill); scanning (progress bar reusing duplicates.tsx style); results (2-column FlashList of `PersonCard`); re-scan button top-right
 - **`PersonCard`** — square card, expo-image cover, `expo-linear-gradient` overlay bottom half (transparent → rgba(0,0,0,0.6)), name bottom-left (unnamed → "Person N" 1-indexed), count badge bottom-right, long-press → inline TextInput rename
-- **`app/people/[id].tsx`** — header with person name + pencil edit button; Alert.prompt on iOS, TextInput modal on Android; 3-column FlashList; tap photo → `/photo/[id]` with `context: 'person'` + `contextId: clusterId`
+- **`app/people/[id].tsx`** — header with person name + pencil edit button; Alert.prompt on iOS, TextInput modal on Android; 3-column FlashList with memoised `renderItem`; tap photo → `/photo/[id]` with `context: 'person'` + `contextId: clusterId`
 - **`app/photo/[id].tsx`** — added `'person'` to `PhotoContext` union; `getAssetIdsForCluster(contextId)` loads asset list same pattern as album/trip contexts
 - **`FloatingTabBar`** — People added as fourth segment (icon: `people` / `people-outline`); per-segment `paddingHorizontal` reduced 14 → 10 to fit four tabs
+- **`app.json`** — `react-native-vision-camera` plugin entry removed; package kept as peer dep only (expo-camera already covers permissions)
 
 ---
 
@@ -230,10 +231,14 @@
 | `galleryStore.invalidate()` / `refreshKey` | Clean decoupled signal for useGallery to refetch without trashStore knowing about the gallery |
 | `UndoToastProvider` inside `SafeAreaProvider` | Allows `useSafeAreaInsets()` inside the provider for correct bottom positioning above FloatingTabBar |
 | Landmark-based embedding vs. true semantic embedding | ML Kit still-image API provides landmark {x,y} positions only (no 128-d embedding); we flatten+normalize to 0–1 relative to face bbox. Cheaper, fully on-device, no model download, but pose/lighting-sensitive. |
-| `hasEmbeddingForAsset` check before detection | Skips re-running ML Kit on already-processed assets so re-scans are fast; clustering is always re-run on unclustered rows only |
-| `persistClusteringResults` single transaction | Cluster upserts and embedding assignments are committed atomically to prevent orphaned face_embeddings rows if the app crashes mid-clustering |
+| Fixed-length 20-float landmark vectors (zero-pad missing landmarks) | Variable-length vectors cause Euclidean distance to return Infinity, fragmenting the same person across multiple sub-threshold clusters. Padding ensures all vectors are comparable regardless of pose/occlusion. |
+| `getScannedAssetIds()` + Set upfront vs. per-asset `hasEmbeddingForAsset` | N sequential DB round-trips before any detection stall the progress bar; a single SELECT DISTINCT query + Set lookup converts the check to O(1) per asset |
+| `persistClusteringResults` deletes corrupt rows | Zero-length or wrong-length embedding rows skipped by `continue` stay NULL and re-enter every clustering pass forever; delete them in the same transaction to prevent infinite re-fetch |
+| `rawToClusters()` type-predicate filter | TypeScript doesn't narrow `cover_asset_id` from `string \| null` to `string` across `.filter().map()` chains; a type predicate filter avoids the `?? ''` fallback which would silently produce broken Image URIs if the filter guard were ever relaxed |
+| `persistClusteringResults` single transaction | Cluster upserts, embedding assignments, and corrupt-row deletions are committed atomically to prevent orphaned rows if the app crashes mid-clustering |
 | `MIN_CLUSTER_SIZE = 3` | Hides noise clusters from single stray face detections; only people who appear in ≥ 3 photos are shown |
 | `FACE_CLUSTER_THRESHOLD = 0.6` (Euclidean) | Empirically chosen for landmark vectors; tighter values over-split the same person, looser values merge different people |
+| `react-native-vision-camera` not registered as Expo plugin | The installed version has no `app.plugin.js`; loading its main entry in Node crashes the config evaluator. Permissions are already covered by expo-camera; the package is kept only as a peer dep for Nitro module types. |
 
 ---
 
