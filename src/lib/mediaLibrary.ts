@@ -15,8 +15,9 @@ import {
 import {
   addListener as _addListener,
   removeAllListeners as _removeAllListeners,
+  createAssetAsync as _createAssetAsync,
   type MediaLibraryAssetsChangeEvent,
-} from 'expo-media-library'
+} from 'expo-media-library/legacy'
 
 export type { PermissionResponse }
 export { Asset, Album, MediaType }
@@ -52,7 +53,8 @@ export async function getPhotosByDate(
 }
 
 export async function createAsset(uri: string): Promise<Asset> {
-  return Asset.create(uri)
+  const saved = await _createAssetAsync(uri)
+  return new Asset(saved.id)
 }
 
 export async function deleteAssets(assets: MediaLibraryAsset[]): Promise<void> {
