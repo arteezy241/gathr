@@ -79,8 +79,10 @@ async function resolveTimestamps(assets: MediaLibraryAsset[]): Promise<Resolved[
     const batch = uncached.slice(i, i + BATCH)
     await Promise.all(
       batch.map(async (asset) => {
-        const ms = await asset.getCreationTime()
-        creationTimeCache.set(asset.id, ms ?? 0)
+        const creation = await asset.getCreationTime()
+        // Fall back to modification time for photos without EXIF DATE_TAKEN (e.g. in-app camera)
+        const ms = creation ?? (await asset.getModificationTime()) ?? Date.now()
+        creationTimeCache.set(asset.id, ms)
       }),
     )
   }

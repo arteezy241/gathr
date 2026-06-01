@@ -452,8 +452,8 @@ export default function CameraScreen() {
         await addAssetsToAlbum(selectedAlbumId, [asset.id])
         await updateAlbumCover(selectedAlbumId, asset.id)
       }
-      useGalleryStore.getState().prependAssets([asset])
       hapticSuccess()
+      setTimeout(() => { useGalleryStore.getState().invalidate() }, 2000)
     } catch (e) {
       showInfo('Capture failed', e instanceof Error ? e.message : 'Could not take photo.')
     } finally {
@@ -477,27 +477,24 @@ export default function CameraScreen() {
         break
       }
     }
-    const savedAssets: import('@/lib/mediaLibrary').MediaLibraryAsset[] = []
+    const savedIds: string[] = []
     for (const uri of uris) {
       try {
         const asset = await createAsset(uri)
-        savedAssets.push(asset)
+        savedIds.push(asset.id)
         setLastUri(uri)
       } catch {
         // skip failed saves
       }
     }
-    if (savedAssets.length > 0) {
-      useGalleryStore.getState().prependAssets(savedAssets)
-    }
-    if (selectedAlbumId !== null && savedAssets.length > 0) {
-      const assetIds = savedAssets.map((a) => a.id)
-      await addAssetsToAlbum(selectedAlbumId, assetIds)
-      const lastId = assetIds[assetIds.length - 1]
+    if (selectedAlbumId !== null && savedIds.length > 0) {
+      await addAssetsToAlbum(selectedAlbumId, savedIds)
+      const lastId = savedIds[savedIds.length - 1]
       if (lastId !== undefined) await updateAlbumCover(selectedAlbumId, lastId)
     }
     hapticSuccess()
     setBurstCount(0)
+    setTimeout(() => { useGalleryStore.getState().invalidate() }, 2000)
   }
 
   // ── Video ─────────────────────────────────────────────────────────────────────
@@ -519,12 +516,12 @@ export default function CameraScreen() {
       if (result !== undefined && result.uri.length > 0) {
         setLastUri(result.uri)
         const asset = await createAsset(result.uri)
-        useGalleryStore.getState().prependAssets([asset])
         if (selectedAlbumId !== null) {
           await addAssetsToAlbum(selectedAlbumId, [asset.id])
           await updateAlbumCover(selectedAlbumId, asset.id)
         }
         hapticSuccess()
+        setTimeout(() => { useGalleryStore.getState().invalidate() }, 2000)
       }
     } catch (e) {
       setIsRecording(false)
