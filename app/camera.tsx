@@ -64,6 +64,52 @@ const BURST_DELAY_MS = 250
 
 const { width: SCREEN_W } = Dimensions.get('window')
 
+// ─── Mode item with spring animation ─────────────────────────────────────────
+
+function ModeItem({
+  label,
+  isActive,
+  onPress,
+  disabled,
+}: {
+  label: string
+  isActive: boolean
+  onPress: () => void
+  disabled?: boolean
+}) {
+  const scale = useRef(new Animated.Value(isActive ? 1.1 : 0.9)).current
+  const dotOpacity = useRef(new Animated.Value(isActive ? 1 : 0)).current
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: isActive ? 1.1 : 0.9, useNativeDriver: true, speed: 28, bounciness: 8 }),
+      Animated.timing(dotOpacity, { toValue: isActive ? 1 : 0, duration: 150, useNativeDriver: true }),
+    ]).start()
+  }, [isActive])
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [modeItemS.wrap, pressed && modeItemS.pressed]}
+      hitSlop={8}
+      disabled={disabled}
+    >
+      <Animated.Text style={[modeItemS.text, isActive && modeItemS.textActive, { transform: [{ scale }] }]}>
+        {label}
+      </Animated.Text>
+      <Animated.View style={[modeItemS.dot, { opacity: dotOpacity }]} />
+    </Pressable>
+  )
+}
+
+const modeItemS = StyleSheet.create({
+  wrap: { alignItems: 'center', gap: 4 },
+  pressed: { opacity: 0.6 },
+  text: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.5)', letterSpacing: 0.8 },
+  textActive: { color: '#FFD60A' },
+  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#FFD60A' },
+})
+
 // ─── Grid overlay ─────────────────────────────────────────────────────────────
 
 function GridOverlay() {
@@ -723,24 +769,20 @@ export default function CameraScreen() {
         style={s.modeBar}
         bounces={false}
       >
-        {MODES.map(({ key, label }) => {
-          const isActive = key === mode
-          return (
-            <Pressable
-              key={key}
-              onPress={() => {
-                if (isRecording) return
-                setMode(key)
-                setScanResult(null)
-              }}
-              style={({ pressed }) => [s.modeItem, pressed && s.modeItemPressed]}
-              hitSlop={8}
-            >
-              <Text style={[s.modeText, isActive && s.modeTextActive]}>{label}</Text>
-              {isActive && <View style={s.modeDot} />}
-            </Pressable>
-          )
-        })}
+        {MODES.map(({ key, label }) => (
+          <ModeItem
+            key={key}
+            label={label}
+            isActive={key === mode}
+            disabled={isRecording}
+            onPress={() => {
+              if (isRecording) return
+              hapticTap()
+              setMode(key)
+              setScanResult(null)
+            }}
+          />
+        ))}
       </ScrollView>
 
       {/* Bottom bar */}
@@ -949,28 +991,6 @@ const s = StyleSheet.create({
     paddingHorizontal: SCREEN_W / 2 - 60,
     gap: 28,
     alignItems: 'center',
-  },
-  modeItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  modeItemPressed: {
-    opacity: 0.6,
-  },
-  modeText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
-    letterSpacing: 0.8,
-  },
-  modeTextActive: {
-    color: '#FFD60A',
-  },
-  modeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#FFD60A',
   },
 
   // Bottom bar
