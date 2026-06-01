@@ -60,6 +60,12 @@ export async function deleteAssets(assets: MediaLibraryAsset[]): Promise<void> {
   await Asset.delete(assets)
 }
 
+/** Permanently delete assets by ID. Used by the trash store — normal deletes should use deleteAssets. */
+export async function permanentlyDeleteByIds(assetIds: string[]): Promise<void> {
+  if (assetIds.length === 0) return
+  await Asset.delete(assetIds.map((id) => new Asset(id)))
+}
+
 export async function getRecentPhotos(limit: number): Promise<Asset[]> {
   return new Query()
     .within(AssetField.MEDIA_TYPE, [MediaType.IMAGE, MediaType.VIDEO])

@@ -14,7 +14,7 @@ import { PhotoPickerModal } from '@/features/albums/components/PhotoPickerModal'
 import { ScrollIndicator } from '@/components/ui/ScrollIndicator'
 
 const NUM_COLUMNS = 3
-const SCREEN_WIDTH = Dimensions.get('window').width
+
 
 // Android asset IDs are content URIs ending in a numeric media-store ID.
 // Higher number = more recently added to the device library.

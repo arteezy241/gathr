@@ -100,6 +100,12 @@ async function openAndInit(): Promise<SQLiteDatabase> {
       trip_id TEXT PRIMARY KEY,
       dismissed_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS trash (
+      asset_id TEXT PRIMARY KEY,
+      original_uri TEXT NOT NULL,
+      deleted_at INTEGER NOT NULL
+    );
   `)
   try {
     await db.execAsync('ALTER TABLE trips ADD COLUMN place TEXT;')
@@ -307,4 +313,51 @@ export async function dismissTripSuggestion(tripId: string): Promise<void> {
     'INSERT OR IGNORE INTO trip_album_dismissed (trip_id, dismissed_at) VALUES (?, ?)',
     [tripId, Date.now()],
   )
+}
+
+// ── Trash ─────────────────────────────────────────────────────────────────────
+
+export interface TrashRow {
+  asset_id: string
+  original_uri: string
+  deleted_at: number
+}
+
+export async function addToTrash(assetId: string, uri: string): Promise<void> {
+  const db = await getDb()
+  await db.runAsync(
+    'INSERT OR REPLACE INTO trash (asset_id, original_uri, deleted_at) VALUES (?, ?, ?)',
+    [assetId, uri, Date.now()],
+  )
+}
+
+export async function removeFromTrash(assetId: string): Promise<void> {
+  const db = await getDb()
+  await db.runAsync('DELETE FROM trash WHERE asset_id = ?', [assetId])
+}
+
+export async function getAllTrash(): Promise<TrashRow[]> {
+  const db = await getDb()
+  return db.getAllAsync<TrashRow>(
+    'SELECT asset_id, original_uri, deleted_at FROM trash ORDER BY deleted_at DESC',
+    [],
+  )
+}
+
+export async function purgeExpiredTrash(beforeMs: number): Promise<string[]> {
+  const db = await getDb()
+  const rows = await db.getAllAsync<{ asset_id: string }>(
+    'SELECT asset_id FROM trash WHERE deleted_at < ?',
+    [beforeMs],
+  )
+  const ids = rows.map((r) => r.asset_id)
+  if (ids.length > 0) {
+    await db.runAsync('DELETE FROM trash WHERE deleted_at < ?', [beforeMs])
+  }
+  return ids
+}
+
+export async function clearTrash(): Promise<void> {
+  const db = await getDb()
+  await db.runAsync('DELETE FROM trash', [])
 }

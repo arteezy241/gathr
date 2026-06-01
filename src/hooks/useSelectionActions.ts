@@ -3,10 +3,11 @@ import { Alert } from 'react-native'
 import { useSelectionStore } from '@/store/selectionStore'
 import { useGalleryStore } from '@/store/galleryStore'
 import { useAlbumStore } from '@/store/albumStore'
-import { deleteAssets } from '@/lib/mediaLibrary'
+import { useTrashStore } from '@/store/trashStore'
 import { shareMultipleAssets } from '@/lib/sharing'
 import { exportAssetsAsZip, type ExportProgress } from '@/lib/exportZip'
-import { hapticTap, hapticSuccess, hapticWarning, hapticDelete } from '@/lib/haptics'
+import { hapticTap, hapticSuccess, hapticWarning } from '@/lib/haptics'
+import { useUndoToast } from '@/components/ui/UndoToast'
 
 export function useSelectionActions() {
   const selectedIds = useSelectionStore((s) => s.selectedIds)
@@ -14,6 +15,7 @@ export function useSelectionActions() {
   const assets = useGalleryStore((s) => s.assets)
   const removeAssets = useGalleryStore((s) => s.removeAssets)
   const { albums, loadAlbums, addAssetsToAlbum } = useAlbumStore()
+  const { showToast } = useUndoToast()
 
   const [isSharing, setIsSharing] = useState(false)
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null)
@@ -86,29 +88,21 @@ export function useSelectionActions() {
     const toDelete = selected
     if (toDelete.length === 0) return
     hapticWarning()
-    Alert.alert(
-      'Delete Photos',
-      `Delete ${String(toDelete.length)} photo${toDelete.length === 1 ? '' : 's'}? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              try {
-                await hapticDelete()
-                await deleteAssets(toDelete)
-                removeAssets(toDelete.map((a) => a.id))
-                clearSelection()
-              } catch (e) {
-                Alert.alert('Delete Failed', e instanceof Error ? e.message : 'Could not delete photos.')
-              }
-            })()
-          },
-        },
-      ],
-    )
+    const ids = toDelete.map((a) => a.id)
+    void (async () => {
+      try {
+        await Promise.all(ids.map((id) => useTrashStore.getState().moveToTrash(id)))
+        removeAssets(ids)
+        clearSelection()
+        const count = ids.length
+        const label = `${String(count)} ${count === 1 ? 'photo' : 'photos'} moved to Trash`
+        showToast(label, () => {
+          void Promise.all(ids.map((id) => useTrashStore.getState().restoreFromTrash(id)))
+        })
+      } catch (e) {
+        Alert.alert('Error', e instanceof Error ? e.message : 'Could not move photos to Trash.')
+      }
+    })()
   }
 
   return {

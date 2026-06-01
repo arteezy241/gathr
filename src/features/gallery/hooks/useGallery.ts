@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { addListener, removeAllListeners, getPhotosByDate } from '@/lib/mediaLibrary'
 import { useGalleryStore } from '@/store/galleryStore'
+import { useTrashStore } from '@/store/trashStore'
 
 const PAGE_SIZE = 100
 
@@ -18,6 +19,7 @@ export function useGallery(): GalleryResult {
   const error = useGalleryStore((s) => s.error)
   const hasNextPage = useGalleryStore((s) => s.hasNextPage)
   const endCursor = useGalleryStore((s) => s.endCursor)
+  const refreshKey = useGalleryStore((s) => s.refreshKey)
 
   // Guard against concurrent fetches
   const fetchingRef = useRef(false)
@@ -35,14 +37,21 @@ export function useGallery(): GalleryResult {
 
     try {
       const results = await getPhotosByDate(PAGE_SIZE, cursor)
+
+      // Filter out soft-deleted (trashed) assets
+      const trashedIds = new Set(useTrashStore.getState().items.map((i) => i.assetId))
+      const filtered = trashedIds.size > 0
+        ? results.filter((a) => !trashedIds.has(a.id))
+        : results
+
       const offset = cursor !== undefined ? parseInt(cursor, 10) : 0
       const nextCursor = String(offset + results.length)
       const nextHasMore = results.length === PAGE_SIZE
 
       if (isInitial) {
-        setAssets(results)
+        setAssets(filtered)
       } else {
-        appendAssets(results)
+        appendAssets(filtered)
       }
       setPagination(nextHasMore, nextHasMore ? nextCursor : undefined)
     } catch (err) {
@@ -57,7 +66,7 @@ export function useGallery(): GalleryResult {
 
   useEffect(() => {
     void fetchPage(undefined, true)
-  }, [fetchPage])
+  }, [fetchPage, refreshKey])
 
   // Reload the first page whenever the device media library changes (new photo taken, deleted, etc.)
   useEffect(() => {

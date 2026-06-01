@@ -29,11 +29,14 @@ import { GlassView } from '@/components/ui/GlassView'
 import { BlurView } from 'expo-blur'
 import { getAlbumAssetIds, getTrip, removeAssetsFromAlbum, updateAlbumCover } from '@/lib/db'
 import { shareAsset } from '@/lib/sharing'
-import { deleteAssets, createAsset } from '@/lib/mediaLibrary'
+import { createAsset } from '@/lib/mediaLibrary'
+import { hapticWarning } from '@/lib/haptics'
 import { ImageManipulator, FlipType, SaveFormat } from 'expo-image-manipulator'
 import { useGalleryStore } from '@/store/galleryStore'
 import { useAlbumStore } from '@/store/albumStore'
 import { useFavoriteStore } from '@/store/favoriteStore'
+import { useTrashStore } from '@/store/trashStore'
+import { useUndoToast } from '@/components/ui/UndoToast'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 const HIDE_DELAY_MS = 3000
@@ -451,6 +454,7 @@ export default function PhotoDetailScreen() {
   const removeAssets = useGalleryStore((s) => s.removeAssets)
   const { albums, loadAlbums, addAssetsToAlbum } = useAlbumStore()
   const { favoriteIds, loadFavorites, toggleFavorite } = useFavoriteStore()
+  const { showToast } = useUndoToast()
 
   const context = toPhotoContext(contextParam)
 
@@ -720,25 +724,15 @@ export default function PhotoDetailScreen() {
 
   function handleDelete() {
     if (currentAsset === null) return
-    const assetToDelete = currentAsset
-    Alert.alert('Delete Photo', 'This photo will be deleted from your library.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            try {
-              await deleteAssets([assetToDelete])
-              removeAssets([assetToDelete.id])
-              router.back()
-            } catch (e) {
-              Alert.alert('Delete Failed', e instanceof Error ? e.message : 'Could not delete photo.')
-            }
-          })()
-        },
-      },
-    ])
+    const assetId = currentAsset.id
+    hapticWarning()
+    void useTrashStore.getState().moveToTrash(assetId).then(() => {
+      removeAssets([assetId])
+      router.back()
+      showToast('Photo moved to Trash', () => {
+        void useTrashStore.getState().restoreFromTrash(assetId)
+      })
+    })
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
