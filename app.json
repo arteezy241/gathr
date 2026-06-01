@@ -65,8 +65,11 @@
       ],
       [
         "react-native-fast-tflite",
-        { "enableCoreMLDelegate": true }
-      ]
+        {
+          "enableCoreMLDelegate": true
+        }
+      ],
+      "expo-font"
     ],
     "extra": {
       "router": {},
