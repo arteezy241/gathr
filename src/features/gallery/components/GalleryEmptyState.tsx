@@ -13,7 +13,7 @@ export function GalleryEmptyState() {
     <View style={styles.container}>
       <Svg width={120} height={120} viewBox="0 0 120 120">
         {/* Camera body */}
-        <Rect transform={{ translateX: 8, translateY: 36 }} width="104" height="66" rx="10" stroke={stroke} strokeWidth="2.5" fill="none" />
+        <Rect transform="translate(8, 36)" width="104" height="66" rx="10" stroke={stroke} strokeWidth="2.5" fill="none" />
         {/* Viewfinder bump */}
         <Path
           d="M40 36 L48 22 L72 22 L80 36"

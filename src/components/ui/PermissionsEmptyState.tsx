@@ -10,14 +10,14 @@ export function PermissionsEmptyState() {
     <View style={styles.container}>
       <Svg width={120} height={120} viewBox="0 0 120 120">
         {/* Photo frame */}
-        <Rect transform={{ translateX: 10, translateY: 15 }} width="100" height="82" rx="8" stroke={colors.textSecondary} strokeWidth="2.5" fill="none" />
+        <Rect transform="translate(10, 15)" width="100" height="82" rx="8" stroke={colors.textSecondary} strokeWidth="2.5" fill="none" />
         {/* Lock shackle */}
         <Path
           d="M48 67 L48 56 Q48 44 60 44 Q72 44 72 56 L72 67"
           stroke={colors.textSecondary} strokeWidth="2" fill="none" strokeLinecap="round"
         />
         {/* Lock body */}
-        <Rect transform={{ translateX: 40, translateY: 66 }} width="40" height="30" rx="5" stroke={colors.textSecondary} strokeWidth="2" fill="none" />
+        <Rect transform="translate(40, 66)" width="40" height="30" rx="5" stroke={colors.textSecondary} strokeWidth="2" fill="none" />
         <Circle cx="60" cy="80" r="3.5" fill={colors.textSecondary} />
       </Svg>
 
