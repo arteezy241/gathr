@@ -26,18 +26,18 @@ const LANDMARK_KEYS: ReadonlyArray<keyof Landmarks> = [
   'LEFT_CHEEK', 'RIGHT_CHEEK', 'LEFT_EAR', 'RIGHT_EAR',
 ]
 
+// Always emit exactly LANDMARK_KEYS.length * 2 floats — zero-pad missing landmarks so all
+// vectors are the same length regardless of how many landmarks ML Kit detected in a given pose.
 function flattenLandmarks(landmarks: Landmarks, bx: number, by: number, bw: number, bh: number): number[] {
   const pts: number[] = []
   for (const key of LANDMARK_KEYS) {
     const pt = landmarks[key]
-    if (pt !== undefined) {
-      pts.push(
-        bw > 0 ? (pt.x - bx) / bw : 0,
-        bh > 0 ? (pt.y - by) / bh : 0,
-      )
-    }
+    pts.push(
+      pt !== undefined && bw > 0 ? (pt.x - bx) / bw : 0,
+      pt !== undefined && bh > 0 ? (pt.y - by) / bh : 0,
+    )
   }
-  return pts
+  return pts  // always LANDMARK_KEYS.length * 2 = 20 floats
 }
 
 export function detectFacesInAsset(assetUri: string): Promise<DetectedFace[]> {
@@ -50,7 +50,6 @@ export function detectFacesInAsset(assetUri: string): Promise<DetectedFace[]> {
         const { x: bx, y: by, width: bw, height: bh } = face.bounds
         if (!face.landmarks) return null
         const pts = flattenLandmarks(face.landmarks, bx, by, bw, bh)
-        if (pts.length === 0) return null
         return { embedding: pts, bbox: { x: bx, y: by, w: bw, h: bh } }
       })
       .filter((f): f is DetectedFace => f !== null)

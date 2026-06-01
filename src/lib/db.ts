@@ -466,6 +466,7 @@ export async function getAssetIdsForCluster(clusterId: string): Promise<string[]
 export async function persistClusteringResults(
   clusterRows: FaceClusterRow[],
   embeddingAssignments: { id: string; clusterId: string }[],
+  corruptEmbeddingIds: string[] = [],
 ): Promise<void> {
   const db = await getDb()
   await db.withExclusiveTransactionAsync(async (txn) => {
@@ -480,7 +481,19 @@ export async function persistClusteringResults(
     for (const { id, clusterId } of embeddingAssignments) {
       await txn.runAsync('UPDATE face_embeddings SET cluster_id = ? WHERE id = ?', [clusterId, id])
     }
+    for (const id of corruptEmbeddingIds) {
+      await txn.runAsync('DELETE FROM face_embeddings WHERE id = ?', [id])
+    }
   })
+}
+
+export async function getScannedAssetIds(): Promise<string[]> {
+  const db = await getDb()
+  const rows = await db.getAllAsync<{ asset_id: string }>(
+    'SELECT DISTINCT asset_id FROM face_embeddings',
+    [],
+  )
+  return rows.map((r) => r.asset_id)
 }
 
 export async function hasEmbeddingForAsset(assetId: string): Promise<boolean> {

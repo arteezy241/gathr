@@ -5,9 +5,10 @@ import { type Asset } from '@/lib/mediaLibrary'
 import {
   saveFaceEmbedding,
   getAllClusters,
+  getScannedAssetIds,
   renameCluster,
   getAssetIdsForCluster,
-  hasEmbeddingForAsset,
+  type FaceClusterRow,
 } from '@/lib/db'
 import { detectFacesInAsset } from '@/lib/faceDetector'
 import { runClustering } from '@/lib/faceClusterer'
@@ -39,6 +40,19 @@ type PeopleActions = {
   getPhotosForPerson: (clusterId: string) => Promise<string[]>
 }
 
+function rawToClusters(raw: FaceClusterRow[]): PersonCluster[] {
+  return raw
+    .filter((c): c is FaceClusterRow & { cover_asset_id: string } =>
+      c.photo_count >= MIN_CLUSTER_SIZE && c.cover_asset_id !== null,
+    )
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      coverAssetId: c.cover_asset_id,
+      photoCount: c.photo_count,
+    }))
+}
+
 export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
   clusters: [],
   isScanning: false,
@@ -47,14 +61,7 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
 
   loadClusters: async () => {
     const raw = await getAllClusters()
-    const clusters: PersonCluster[] = raw
-      .filter((c) => c.photo_count >= MIN_CLUSTER_SIZE && c.cover_asset_id !== null)
-      .map((c) => ({
-        id: c.id,
-        name: c.name,
-        coverAssetId: c.cover_asset_id ?? '',
-        photoCount: c.photo_count,
-      }))
+    const clusters = rawToClusters(raw)
     const lastRaw = await SecureStore.getItemAsync(LAST_SCANNED_KEY)
     const lastScannedAt = lastRaw !== null ? parseInt(lastRaw, 10) : null
     set({ clusters, lastScannedAt })
@@ -66,14 +73,15 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
       const total = assets.length
       let processed = 0
 
+      // Load all already-scanned asset IDs in one query instead of N per-asset round-trips
+      const scannedIds = new Set(await getScannedAssetIds())
+
       for (let i = 0; i < assets.length; i += BATCH_SIZE) {
         const batch = assets.slice(i, i + BATCH_SIZE)
 
         for (const asset of batch) {
           try {
-            // Skip assets already present in face_embeddings
-            const alreadyScanned = await hasEmbeddingForAsset(asset.id)
-            if (alreadyScanned) {
+            if (scannedIds.has(asset.id)) {
               processed++
               continue
             }
@@ -116,16 +124,7 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
       const now = Date.now()
       await SecureStore.setItemAsync(LAST_SCANNED_KEY, String(now))
 
-      const raw = await getAllClusters()
-      const clusters: PersonCluster[] = raw
-        .filter((c) => c.photo_count >= MIN_CLUSTER_SIZE && c.cover_asset_id !== null)
-        .map((c) => ({
-          id: c.id,
-          name: c.name,
-          coverAssetId: c.cover_asset_id ?? '',
-          photoCount: c.photo_count,
-        }))
-
+      const clusters = rawToClusters(await getAllClusters())
       set({ clusters, isScanning: false, scanProgress: 100, lastScannedAt: now })
     } catch {
       set({ isScanning: false })

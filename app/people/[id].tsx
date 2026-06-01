@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   Dimensions,
@@ -102,7 +102,7 @@ export default function PersonDetailScreen() {
     setIsRenaming(false)
   }
 
-  const renderItem = ({ item }: ListRenderItemInfo<PhotoRow>) => (
+  const renderItem = useCallback(({ item }: ListRenderItemInfo<PhotoRow>) => (
     <View style={styles.row}>
       {item.assets.map((asset) => (
         <PhotoThumb
@@ -128,7 +128,7 @@ export default function PersonDetailScreen() {
           <View key={`empty-${String(i)}`} style={styles.thumbPlaceholder} />
         ))}
     </View>
-  )
+  ), [allAssetIds, selectedIds, styles, router, id, selectAll, setLastSelected])
 
   return (
     <>
