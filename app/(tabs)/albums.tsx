@@ -13,7 +13,10 @@ import { useAlbumStore } from '@/store/albumStore'
 import { useBiometricAuth } from '@/features/private-albums/hooks/useBiometricAuth'
 import { AlbumCard } from '@/features/albums/components/AlbumCard'
 import { CreateAlbumSheet } from '@/features/albums/components/CreateAlbumSheet'
+import { AlbumsEmptyState } from '@/features/albums/components/AlbumsEmptyState'
+import { PermissionsEmptyState } from '@/components/ui/PermissionsEmptyState'
 import { useTheme } from '@/lib/themeContext'
+import { usePermissions } from '@/hooks/usePermissions'
 import { radius, spacing, typography, type ThemeColors } from '@/lib/theme'
 
 const GAP = 10
@@ -32,6 +35,7 @@ export default function AlbumsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { colors } = useTheme()
+  const { granted, requesting } = usePermissions()
   const { albums, isLoading, loadAlbums } = useAlbumStore()
   const { authenticate } = useBiometricAuth()
   const [sheetVisible, setSheetVisible] = useState(false)
@@ -210,7 +214,9 @@ export default function AlbumsScreen() {
             />
           </Pressable>
         </View>
-        {isLoading && albums.length === 0 ? (
+        {!requesting && !granted ? (
+          <PermissionsEmptyState />
+        ) : isLoading && albums.length === 0 ? (
           <View style={styles.skeletonGrid}>
             {Array.from({ length: SKELETON_ALBUM_COUNT / 2 }).map((_, rowIndex) => (
               <View key={rowIndex} style={styles.skeletonRow}>
@@ -226,10 +232,7 @@ export default function AlbumsScreen() {
             ))}
           </View>
         ) : !isLoading && albums.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No Albums Yet</Text>
-            <Text style={styles.emptyBody}>Tap + to create your first album.</Text>
-          </View>
+          <AlbumsEmptyState onCreateAlbum={() => { hapticAction(); setSheetVisible(true) }} />
         ) : (
           <FlashList
             data={rows}
@@ -310,22 +313,6 @@ function makeStyles(colors: ThemeColors, topPad: number, bottomPad: number) {
     },
     cardPlaceholder: {
       width: ALBUM_CARD_SIZE,
-    },
-    empty: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: spacing.xl,
-    },
-    emptyTitle: {
-      ...typography.headline,
-      color: colors.text,
-      marginBottom: spacing.sm,
-    },
-    emptyBody: {
-      ...typography.body,
-      color: colors.textTertiary,
-      textAlign: 'center',
     },
     fab: {
       position: 'absolute',
