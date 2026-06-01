@@ -154,6 +154,12 @@
 - `app/duplicates.tsx` — three states: pre-scan, scanning (progress bar), results (group cards); thumbnails with green "Keep" badge + red trash overlay on tap; per-group Delete N / Dismiss actions
 - Entry point: copy icon in Albums toolbar
 
+### Phase 20 — Bug Fixes & UX Polish
+- **DB init race fix** — `getDb()` now memoizes a single `openAndInit()` Promise; concurrent callers (layout + albums tab) all await the same Promise instead of firing duplicate `execAsync` calls; PRAGMAs run as separate `execAsync` calls before DDL to avoid rejection
+- **Memories race fix** — gallery screen now calls `loadTrips()` on mount to pre-populate trips from DB; memories reload after each `detectAndSaveTrips` pass via `memoriesGroupedAtRef` (tracks last `lastGroupedAt` value loaded for), so trip memory cards appear correctly
+- **Save as Album consolidated** — removed separate "Save as Album?" suggestion row above Trips & Events; "Save as Album" pill button now overlays each TripCard directly (top-right corner), visible only for unsaved trips; tapping saves + dismisses automatically
+- **Album drag-to-select** — album detail (`album/[id].tsx`) now has full PanResponder drag-to-select matching the gallery grid: `getAssetAt` hit-tests via `THUMB_SIZE` row height (no date headers), `isSelectingRef`/`selectedIdsRef`/`rowsRef` kept current via effects, `panHandlers` applied only when `isSelecting`
+
 ---
 
 ## Key Architecture Decisions
@@ -178,6 +184,9 @@
 | `context: 'memory'` in photo viewer | Prevents viewer from using full gallery (where old photos may be paginated out); re-fetches that day's photos fresh |
 | `recordAsync` + 400ms settle delay for video | Native camera needs time to switch from picture to video mode before `recordAsync` is safe to call |
 | Zoom values calibrated small (0.015 for 2×, 0.04 for 5×) | Flagship Android (Xiaomi 15) has ~200× digital max; `expo-camera zoom` is 0–1 of device max |
+| `_dbPromise` memoizes `openAndInit()` in `db.ts` | Prevents concurrent `execAsync` rejections when `initDb()` is called from multiple entry points simultaneously |
+| `memoriesGroupedAtRef` tracks last `lastGroupedAt` loaded | Fires memories load on mount (undefined ≠ null) and again after trip detection (null ≠ timestamp), without reloading on unrelated `trips` reference changes |
+| "Save as Album" button embedded in TripCard | Removes redundant suggestion row; action lives where the trip is already displayed |
 
 ---
 

@@ -3,6 +3,7 @@ import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react
 import { useRouter } from 'expo-router'
 import { useGalleryStore } from '@/store/galleryStore'
 import { useTripStore } from '@/store/tripStore'
+import { useTripSuggestionStore } from '@/store/tripSuggestionStore'
 import { type StoredTrip } from '@/lib/db'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useTheme } from '@/lib/themeContext'
@@ -56,6 +57,8 @@ export function TripsSection() {
   const { colors } = useTheme()
   const { trips, isLoading } = useTripStore()
   const assets = useGalleryStore((s) => s.assets)
+  const { suggestions, saving, saveSuggestionAsAlbum } = useTripSuggestionStore()
+  const suggestionIds = useMemo(() => new Set(suggestions.map((s) => s.trip.id)), [suggestions])
 
   const styles = useMemo(() => makeStyles(colors), [colors])
 
@@ -97,6 +100,10 @@ export function TripsSection() {
                 trip={trip}
                 coverAsset={assetMap.get(trip.coverAssetId)}
                 onPress={() => { router.push(`/trip/${trip.id}`) }}
+                isSavingAlbum={saving === trip.id}
+                {...(suggestionIds.has(trip.id) && {
+                  onSaveAsAlbum: () => { void saveSuggestionAsAlbum({ trip }) },
+                })}
               />
               {count > 1 && (
                 <View style={styles.clusterBadge}>

@@ -54,32 +54,14 @@ interface TripRow {
   place: string | null
 }
 
-let _db: SQLiteDatabase | null = null
+let _dbPromise: Promise<SQLiteDatabase> | null = null
 
-async function getDb(): Promise<SQLiteDatabase> {
-  if (_db === null) {
-    _db = await openDatabaseAsync('gathr.db')
-  }
-  return _db
-}
-
-function rowToAlbum(row: AlbumRow): Album {
-  return {
-    id: row.id,
-    name: row.name,
-    isPrivate: row.is_private === 1,
-    coverAssetId: row.cover_asset_id,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }
-}
-
-export async function initDb(): Promise<void> {
-  const db = await getDb()
+async function openAndInit(): Promise<SQLiteDatabase> {
+  const db = await openDatabaseAsync('gathr.db')
+  // Run PRAGMAs individually — mixing them with DDL in one execAsync can fail
+  await db.execAsync('PRAGMA journal_mode = WAL;')
+  await db.execAsync('PRAGMA foreign_keys = ON;')
   await db.execAsync(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA foreign_keys = ON;
-
     CREATE TABLE IF NOT EXISTS albums (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -119,12 +101,35 @@ export async function initDb(): Promise<void> {
       dismissed_at INTEGER NOT NULL
     );
   `)
-  // Add place column if upgrading from an older schema
   try {
     await db.execAsync('ALTER TABLE trips ADD COLUMN place TEXT;')
   } catch {
     // Column already exists — ignore
   }
+  return db
+}
+
+function getDb(): Promise<SQLiteDatabase> {
+  if (_dbPromise === null) {
+    _dbPromise = openAndInit()
+  }
+  return _dbPromise
+}
+
+function rowToAlbum(row: AlbumRow): Album {
+  return {
+    id: row.id,
+    name: row.name,
+    isPrivate: row.is_private === 1,
+    coverAssetId: row.cover_asset_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+/** Call once at app startup to warm-up the DB. All queries already wait for init via getDb(). */
+export async function initDb(): Promise<void> {
+  await getDb()
 }
 
 export async function createAlbum(name: string, isPrivate: boolean): Promise<string> {

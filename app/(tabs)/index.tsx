@@ -12,7 +12,6 @@ import { PhotoGrid } from '@/features/gallery/components/PhotoGrid'
 import { SelectionBar } from '@/features/gallery/components/SelectionBar'
 import { TripsSection } from '@/features/gallery/components/TripsSection'
 import { MemoriesSection } from '@/features/gallery/components/MemoriesSection'
-import { TripSuggestions } from '@/features/gallery/components/TripSuggestions'
 import { PhotoSearchResults } from '@/features/gallery/components/PhotoSearchResults'
 import { useTheme } from '@/lib/themeContext'
 import { PILL_HEIGHT, PILL_MARGIN_BOTTOM } from '@/components/ui/FloatingTabBar'
@@ -22,7 +21,6 @@ function GalleryHeader() {
   return (
     <View>
       <MemoriesSection />
-      <TripSuggestions />
       <TripsSection />
     </View>
   )
@@ -33,8 +31,10 @@ export default function GalleryScreen() {
   const insets = useSafeAreaInsets()
   const { granted, requesting, request } = usePermissions()
   const assets = useGalleryStore((s) => s.assets)
-  const { trips, lastGroupedAt, detectAndSaveTrips } = useTripStore()
-  const { load: loadMemories, loadedAt: memoriesLoadedAt } = useMemoriesStore()
+  const { trips, lastGroupedAt, detectAndSaveTrips, loadTrips } = useTripStore()
+  const { load: loadMemories } = useMemoriesStore()
+  // Tracks which lastGroupedAt value we last loaded memories for (undefined = never loaded)
+  const memoriesGroupedAtRef = useRef<number | null | undefined>(undefined)
   const { loadSuggestions } = useTripSuggestionStore()
 
   const [searchActive, setSearchActive] = useState(false)
@@ -60,18 +60,24 @@ export default function GalleryScreen() {
   const bottomPad = insets.bottom + PILL_MARGIN_BOTTOM + PILL_HEIGHT + 8
   const styles = useMemo(() => makeStyles(colors, insets.top), [colors, insets.top])
 
+  // Populate trips from DB on mount so memories can include trip memories
+  useEffect(() => {
+    void loadTrips()
+  }, [loadTrips])
+
   useEffect(() => {
     if (assets.length > 0 && lastGroupedAt === null) {
       void detectAndSaveTrips(assets)
     }
   }, [assets, lastGroupedAt, detectAndSaveTrips])
 
-  // Load memories once trips are available
+  // Load memories on mount, then reload after each trip detection pass
   useEffect(() => {
-    if (memoriesLoadedAt === null && trips.length >= 0) {
+    if (memoriesGroupedAtRef.current !== lastGroupedAt) {
+      memoriesGroupedAtRef.current = lastGroupedAt
       void loadMemories(trips)
     }
-  }, [trips, memoriesLoadedAt, loadMemories])
+  }, [trips, lastGroupedAt, loadMemories])
 
   // Load trip-to-album suggestions whenever trips change
   useEffect(() => {
