@@ -235,6 +235,11 @@ export default function PeopleScreen() {
             renderItem={renderItem}
             keyExtractor={keyExtractor}
             numColumns={NUM_COLUMNS}
+            ListHeaderComponent={
+              <Pressable style={[styles.rescanPill, { backgroundColor: colors.surfaceElevated }]} onPress={handleRescan}>
+                <Text style={[styles.rescanPillText, { color: colors.accent }]}>Re-scan Library</Text>
+              </Pressable>
+            }
             contentContainerStyle={{
               padding: spacing.md,
               paddingBottom: insets.bottom + 100,
@@ -312,6 +317,17 @@ function makeStyles(colors: ThemeColors) {
     },
     rescanText: {
       ...typography.body,
+    },
+    rescanPill: {
+      alignSelf: 'flex-end',
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: 20,
+      marginBottom: spacing.sm,
+    },
+    rescanPillText: {
+      fontSize: 13,
+      fontWeight: '600',
     },
   })
 }
