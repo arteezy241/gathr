@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Alert } from 'react-native'
 import { useSelectionStore } from '@/store/selectionStore'
 import { useGalleryStore } from '@/store/galleryStore'
 import { useAlbumStore } from '@/store/albumStore'
@@ -8,6 +7,7 @@ import { shareMultipleAssets } from '@/lib/sharing'
 import { exportAssetsAsZip, type ExportProgress } from '@/lib/exportZip'
 import { hapticTap, hapticSuccess, hapticWarning } from '@/lib/haptics'
 import { useUndoToast } from '@/components/ui/UndoToast'
+import { useSheet } from '@/components/ui/SheetProvider'
 
 export function useSelectionActions() {
   const selectedIds = useSelectionStore((s) => s.selectedIds)
@@ -16,6 +16,7 @@ export function useSelectionActions() {
   const removeAssets = useGalleryStore((s) => s.removeAssets)
   const { albums, loadAlbums, addAssetsToAlbum } = useAlbumStore()
   const { showToast } = useUndoToast()
+  const { showInfo, showSheet } = useSheet()
 
   const [isSharing, setIsSharing] = useState(false)
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null)
@@ -25,11 +26,7 @@ export function useSelectionActions() {
   async function handleShare(): Promise<void> {
     if (isSharing || selected.length === 0) return
     if (selected.length > 1) {
-      Alert.alert(
-        'Share Multiple Photos',
-        'Tap the export button to share all selected photos as a ZIP file.',
-        [{ text: 'OK' }],
-      )
+      showInfo('Share Multiple Photos', 'Tap the export button to share all selected photos as a ZIP file.')
       return
     }
     hapticTap()
@@ -37,7 +34,7 @@ export function useSelectionActions() {
     try {
       await shareMultipleAssets(selected)
     } catch (e) {
-      Alert.alert('Share Failed', e instanceof Error ? e.message : 'An error occurred.')
+      showInfo('Share Failed', e instanceof Error ? e.message : 'An error occurred.')
     } finally {
       setIsSharing(false)
     }
@@ -50,7 +47,7 @@ export function useSelectionActions() {
       await exportAssetsAsZip(selected, (p) => { setExportProgress(p) })
       hapticSuccess()
     } catch (e) {
-      Alert.alert('Export Failed', e instanceof Error ? e.message : 'Could not export photos.')
+      showInfo('Export Failed', e instanceof Error ? e.message : 'Could not export photos.')
     } finally {
       setExportProgress(null)
     }
@@ -61,27 +58,23 @@ export function useSelectionActions() {
     void loadAlbums()
     const publicAlbums = albums.filter((a) => !a.isPrivate)
     if (publicAlbums.length === 0) {
-      Alert.alert('No Albums', 'Create an album first before adding photos.')
+      showInfo('No Albums', 'Create an album first before adding photos.')
       return
     }
-    Alert.alert(
-      'Add to Album',
-      'Choose an album',
-      [
-        ...publicAlbums.map((album) => ({
-          text: album.name,
-          onPress: () => {
-            void (async () => {
-              await addAssetsToAlbum(album.id, [...selectedIds])
-              hapticSuccess()
-              clearSelection()
-              Alert.alert('Added', `Added to ${album.name}`)
-            })()
-          },
-        })),
-        { text: 'Cancel', style: 'cancel' as const },
-      ],
-    )
+    showSheet({
+      title: 'Add to Album',
+      actions: publicAlbums.map((album) => ({
+        label: album.name,
+        onPress: () => {
+          void (async () => {
+            await addAssetsToAlbum(album.id, [...selectedIds])
+            hapticSuccess()
+            clearSelection()
+            showInfo('Added', `Added to ${album.name}`)
+          })()
+        },
+      })),
+    })
   }
 
   function handleDelete(): void {
@@ -100,7 +93,7 @@ export function useSelectionActions() {
           void Promise.all(ids.map((id) => useTrashStore.getState().restoreFromTrash(id)))
         })
       } catch (e) {
-        Alert.alert('Error', e instanceof Error ? e.message : 'Could not move photos to Trash.')
+        showInfo('Error', e instanceof Error ? e.message : 'Could not move photos to Trash.')
       }
     })()
   }

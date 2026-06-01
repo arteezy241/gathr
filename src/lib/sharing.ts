@@ -1,14 +1,10 @@
-import { Alert } from 'react-native'
 import * as Sharing from 'expo-sharing'
 import { type MediaLibraryAsset, createAsset } from '@/lib/mediaLibrary'
 
 export async function shareAsset(asset: MediaLibraryAsset): Promise<void> {
   const uri = await asset.getUri()
   const available = await Sharing.isAvailableAsync()
-  if (!available) {
-    Alert.alert('Sharing Unavailable', 'Sharing is not available on this device.')
-    return
-  }
+  if (!available) throw new Error('Sharing is not available on this device.')
   await Sharing.shareAsync(uri)
 }
 

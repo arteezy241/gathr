@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Dimensions,
   FlatList,
@@ -37,6 +36,7 @@ import { useAlbumStore } from '@/store/albumStore'
 import { useFavoriteStore } from '@/store/favoriteStore'
 import { useTrashStore } from '@/store/trashStore'
 import { useUndoToast } from '@/components/ui/UndoToast'
+import { useSheet } from '@/components/ui/SheetProvider'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 const HIDE_DELAY_MS = 3000
@@ -455,6 +455,7 @@ export default function PhotoDetailScreen() {
   const { albums, loadAlbums, addAssetsToAlbum } = useAlbumStore()
   const { favoriteIds, loadFavorites, toggleFavorite } = useFavoriteStore()
   const { showToast } = useUndoToast()
+  const { showInfo, showConfirm, showSheet } = useSheet()
 
   const context = toPhotoContext(contextParam)
 
@@ -630,21 +631,20 @@ export default function PhotoDetailScreen() {
   function handleAddToAlbum() {
     const publicAlbums = albums.filter((a) => !a.isPrivate)
     if (publicAlbums.length === 0) {
-      Alert.alert('No Albums', 'Create an album first from the Albums tab.')
+      showInfo('No Albums', 'Create an album first from the Albums tab.')
       return
     }
-    const buttons = [
-      ...publicAlbums.map((album) => ({
-        text: album.name,
+    showSheet({
+      title: 'Add to Album',
+      actions: publicAlbums.map((album) => ({
+        label: album.name,
         onPress: () => {
           void addAssetsToAlbum(album.id, [currentAssetId]).then(() => {
-            Alert.alert('Added', `Added to ${album.name}`)
+            showInfo('Added', `Added to ${album.name}`)
           })
         },
       })),
-      { text: 'Cancel', style: 'cancel' as const },
-    ]
-    Alert.alert('Add to Album', 'Choose an album', buttons)
+    })
   }
 
   async function handleShare(): Promise<void> {
@@ -653,7 +653,7 @@ export default function PhotoDetailScreen() {
     try {
       await shareAsset(currentAsset)
     } catch (e) {
-      Alert.alert('Share Failed', e instanceof Error ? e.message : 'An error occurred while sharing.')
+      showInfo('Share Failed', e instanceof Error ? e.message : 'An error occurred while sharing.')
     } finally {
       setIsSharing(false)
     }
@@ -672,57 +672,38 @@ export default function PhotoDetailScreen() {
       const result = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.92 })
       await createAsset(result.uri)
     } catch (e) {
-      Alert.alert('Edit Failed', e instanceof Error ? e.message : 'Could not apply edit.')
+      showInfo('Edit Failed', e instanceof Error ? e.message : 'Could not apply edit.')
     }
   }
 
   function handleOptions() {
     if (currentAsset === null) return
-    const buttons: Array<{ text: string; onPress?: () => void; style?: 'cancel' | 'destructive' | 'default' }> = []
+    const actions: Array<{ label: string; onPress?: () => void; destructive?: boolean }> = []
 
-    // Editing actions (photos only — skip for videos)
-    buttons.push({
-      text: 'Rotate 90°',
-      onPress: () => { void applyEdit([{ rotate: 90 }]) },
-    })
-    buttons.push({
-      text: 'Flip Horizontal',
-      onPress: () => { void applyEdit([{ flip: FlipType.Horizontal }]) },
-    })
-    buttons.push({
-      text: 'Flip Vertical',
-      onPress: () => { void applyEdit([{ flip: FlipType.Vertical }]) },
-    })
+    actions.push({ label: 'Rotate 90°', onPress: () => { void applyEdit([{ rotate: 90 }]) } })
+    actions.push({ label: 'Flip Horizontal', onPress: () => { void applyEdit([{ flip: FlipType.Horizontal }]) } })
+    actions.push({ label: 'Flip Vertical', onPress: () => { void applyEdit([{ flip: FlipType.Vertical }]) } })
 
     if (context === 'album' && contextId !== undefined) {
-      buttons.push({
-        text: 'Set as Album Cover',
+      actions.push({
+        label: 'Set as Album Cover',
         onPress: () => { void updateAlbumCover(contextId, currentAssetId) },
       })
-      buttons.push({
-        text: 'Remove from Album',
-        style: 'destructive',
+      actions.push({
+        label: 'Remove from Album',
+        destructive: true,
         onPress: () => {
-          Alert.alert('Remove from Album', 'Remove this photo from the album?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Remove',
-              style: 'destructive',
-              onPress: () => {
-                void removeAssetsFromAlbum(contextId, [currentAssetId]).then(() => { router.back() })
-              },
-            },
-          ])
+          showConfirm(
+            'Remove from Album',
+            'Remove this photo from the album?',
+            () => { void removeAssetsFromAlbum(contextId, [currentAssetId]).then(() => { router.back() }) },
+            { confirmLabel: 'Remove', destructive: true },
+          )
         },
       })
     }
 
-    if (currentDate !== null) {
-      buttons.push({ text: currentDate })
-    }
-
-    buttons.push({ text: 'Cancel', style: 'cancel' })
-    Alert.alert('Options', undefined, buttons)
+    showSheet({ title: 'Options', message: currentDate !== null ? currentDate : undefined, actions })
   }
 
   function handleDelete() {

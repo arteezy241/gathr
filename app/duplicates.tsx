@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
-  Alert,
   Dimensions,
   Platform,
   Pressable,
@@ -18,6 +17,7 @@ import { useDuplicateStore } from '@/store/duplicateStore'
 import { type DuplicateGroup } from '@/lib/duplicateDetector'
 import { useTheme } from '@/lib/themeContext'
 import { radius, spacing, typography, type ThemeColors } from '@/lib/theme'
+import { useSheet } from '@/components/ui/SheetProvider'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const THUMB_SIZE = Math.floor((SCREEN_WIDTH - 32 - 8 * 2) / 3)
@@ -35,6 +35,7 @@ interface GroupCardProps {
 
 function GroupCard({ group, colors, onDeleteSelected, onDismiss }: GroupCardProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const { showInfo, showConfirm } = useSheet()
 
   const toggle = useCallback((id: string) => {
     setSelected((prev) => {
@@ -50,20 +51,14 @@ function GroupCard({ group, colors, onDeleteSelected, onDismiss }: GroupCardProp
     if (toDelete.length === 0) return
     const kept = group.assets.length - toDelete.length
     if (kept === 0) {
-      Alert.alert('Keep at least one', 'Select the photos you want to delete, not all of them.')
+      showInfo('Keep at least one', 'Select the photos you want to delete, not all of them.')
       return
     }
-    Alert.alert(
+    showConfirm(
       `Delete ${String(toDelete.length)} photo${toDelete.length === 1 ? '' : 's'}?`,
       'This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => { onDeleteSelected(group.id, toDelete) },
-        },
-      ],
+      () => { onDeleteSelected(group.id, toDelete) },
+      { confirmLabel: 'Delete', destructive: true },
     )
   }
 

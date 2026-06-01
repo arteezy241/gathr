@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Platform,
   Pressable,
@@ -16,8 +15,8 @@ import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Path } from 'react-native-svg'
-import { useGalleryStore } from '@/store/galleryStore'
 import { usePeopleStore, shouldRescan, type PersonCluster } from '@/store/peopleStore'
+import { useSheet } from '@/components/ui/SheetProvider'
 import { useTheme } from '@/lib/themeContext'
 import { radius, spacing, typography, type ThemeColors } from '@/lib/theme'
 import { hapticTap } from '@/lib/haptics'
@@ -135,22 +134,24 @@ function PersonCard({ cluster, index, colors, onRename }: PersonCardProps) {
 export default function PeopleScreen() {
   const insets = useSafeAreaInsets()
   const { colors } = useTheme()
-  const allAssets = useGalleryStore((s) => s.assets)
   const { clusters, isScanning, scanProgress, lastScannedAt, startScan, renamePerson, loadClusters } =
     usePeopleStore()
   const styles = useMemo(() => makeStyles(colors), [colors])
+  const { showConfirm } = useSheet()
 
   const hasNeverScanned = lastScannedAt === null && !isScanning
 
   function handleStartScan() {
-    void startScan(allAssets)
+    void startScan()
   }
 
   function handleRescan() {
-    Alert.alert('Re-scan Library', 'This will re-scan your entire library and may take several minutes. Continue?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Scan', onPress: handleStartScan },
-    ])
+    showConfirm(
+      'Re-scan Library',
+      'This will re-scan your entire library and may take several minutes.',
+      handleStartScan,
+      { confirmLabel: 'Scan' },
+    )
   }
 
   const renderItem = useCallback(({ item, index }: ListRenderItemInfo<PersonCluster>) => (
@@ -237,6 +238,11 @@ export default function PeopleScreen() {
             renderItem={renderItem}
             keyExtractor={keyExtractor}
             numColumns={NUM_COLUMNS}
+            ListHeaderComponent={
+              <Pressable style={[styles.rescanPill, { backgroundColor: colors.surfaceElevated }]} onPress={handleRescan}>
+                <Text style={[styles.rescanPillText, { color: colors.accent }]}>Re-scan Library</Text>
+              </Pressable>
+            }
             contentContainerStyle={{
               padding: spacing.md,
               paddingBottom: insets.bottom + 100,
@@ -314,6 +320,17 @@ function makeStyles(colors: ThemeColors) {
     },
     rescanText: {
       ...typography.body,
+    },
+    rescanPill: {
+      alignSelf: 'flex-end',
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: 20,
+      marginBottom: spacing.sm,
+    },
+    rescanPillText: {
+      fontSize: 13,
+      fontWeight: '600',
     },
   })
 }

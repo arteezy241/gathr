@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import * as SecureStore from 'expo-secure-store'
 import * as Crypto from 'expo-crypto'
-import { type Asset } from '@/lib/mediaLibrary'
+import { getRecentPhotos } from '@/lib/mediaLibrary'
 import {
   saveFaceEmbedding,
   getAllClusters,
@@ -35,7 +35,7 @@ type PeopleState = {
 
 type PeopleActions = {
   loadClusters: () => Promise<void>
-  startScan: (assets: Asset[]) => Promise<void>
+  startScan: () => Promise<void>
   renamePerson: (clusterId: string, name: string) => Promise<void>
   getPhotosForPerson: (clusterId: string) => Promise<string[]>
 }
@@ -67,9 +67,10 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
     set({ clusters, lastScannedAt })
   },
 
-  startScan: async (assets) => {
+  startScan: async () => {
     set({ isScanning: true, scanProgress: 0 })
     try {
+      const assets = await getRecentPhotos(2000)
       const total = assets.length
       let processed = 0
 
