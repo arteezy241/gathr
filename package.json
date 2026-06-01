@@ -5,7 +5,7 @@
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
     "@react-native-ml-kit/face-detection": "^2.0.1",
-    "@shopify/flash-list": "^2.3.1",
+    "@shopify/flash-list": "2.0.2",
     "expo": "~56.0.8",
     "expo-blur": "^56.0.3",
     "expo-camera": "~56.0.7",
@@ -28,8 +28,10 @@
     "expo-status-bar": "~56.0.4",
     "expo-video": "~56.1.2",
     "fflate": "^0.8.3",
+    "jpeg-js": "^0.4.4",
     "react": "19.2.3",
     "react-native": "0.85.3",
+    "react-native-fast-tflite": "^3.0.1",
     "react-native-gesture-handler": "~2.31.1",
     "react-native-reanimated": "4.3.1",
     "react-native-safe-area-context": "~5.7.0",
@@ -40,6 +42,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/jpeg-js": "^0.3.0",
     "@types/react": "~19.2.2",
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.60.0",

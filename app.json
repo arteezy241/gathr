@@ -63,6 +63,10 @@
           "color": "#0A84FF"
         }
       ],
+      [
+        "react-native-fast-tflite",
+        { "enableCoreMLDelegate": true }
+      ]
     ],
     "extra": {
       "router": {},

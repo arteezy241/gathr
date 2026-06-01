@@ -46,17 +46,16 @@ const MODES: { key: ShootingMode; label: string }[] = [
 
 const ZOOM_LEVELS: ZoomLevel[] = [0.5, 1, 2, 5]
 
-// Map logical zoom multiplier → expo-camera 0–1 range.
-// expo-camera zoom is 0 (1x) to 1 (device max). Flagship Android phones
-// (Xiaomi 15, Pixel 9 Pro, Galaxy S25 Ultra) have 30–200x digital max,
-// so 2x ≈ 0.01–0.04 and 5x ≈ 0.03–0.08 depending on device. These values
-// are conservative and work correctly across typical flagship max-zoom ranges.
+// Map logical zoom multiplier → expo-camera 0–1 range for DIGITAL zoom (Android + iOS fallback).
+// expo-camera zoom is 0 (device min, ~1x) to 1 (device max). Values chosen to produce
+// clearly visible zoom on mid-range phones (10–30x max); may over-zoom on ultra-flagships.
+// iOS uses optical lens switching for 2x/5x via selectZoomLevel — these values are fallbacks.
 function zoomLevelToValue(level: ZoomLevel): number {
   switch (level) {
-    case 0.5: return 0   // ultrawide — handled via lens switching on iOS
+    case 0.5: return 0    // ultrawide — handled via lens switching on iOS
     case 1:   return 0
-    case 2:   return 0.015
-    case 5:   return 0.04
+    case 2:   return 0.15
+    case 5:   return 0.4
   }
 }
 
@@ -250,6 +249,8 @@ export default function CameraScreen() {
   const [cameraReady, setCameraReady] = useState(false)
   const [videoModeReady, setVideoModeReady] = useState(false)
   const [availableLenses, setAvailableLenses] = useState<string[]>([])
+  const [isPinching, setIsPinching] = useState(false)
+  const pinchHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Focus ring
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null)
@@ -289,6 +290,27 @@ export default function CameraScreen() {
       Math.abs(zoomLevelToValue(cur) - clamped) < Math.abs(zoomLevelToValue(prev) - clamped) ? cur : prev,
     )
     setZoomLevel(mapped)
+    // Show pinch indicator and auto-hide after 1.5s of no pinch
+    setIsPinching(true)
+    if (pinchHideTimer.current !== null) clearTimeout(pinchHideTimer.current)
+    pinchHideTimer.current = setTimeout(() => { setIsPinching(false) }, 1500)
+  }
+
+  // Interpolate zoom 0–1 value to an approx ×N label using calibrated anchors
+  function zoomValueToLabel(v: number): string {
+    if (v <= 0) return '1×'
+    if (v <= zoomLevelToValue(2)) {
+      const ratio = 1 + (v / zoomLevelToValue(2))
+      return `~${ratio.toFixed(1)}×`
+    }
+    if (v <= zoomLevelToValue(5)) {
+      const t = (v - zoomLevelToValue(2)) / (zoomLevelToValue(5) - zoomLevelToValue(2))
+      const ratio = 2 + t * 3
+      return `~${ratio.toFixed(1)}×`
+    }
+    const t = (v - zoomLevelToValue(5)) / (1 - zoomLevelToValue(5))
+    const ratio = 5 + t * 10
+    return `~${ratio.toFixed(0)}×`
   }
 
   const pinchGesture = Gesture.Pinch()
@@ -320,10 +342,26 @@ export default function CameraScreen() {
 
   const hasUltrawide = availableLenses.includes('builtInUltraWideCamera')
 
+  // iOS telephoto lens names that give true optical zoom at their named multiplier
+  const iosLensFor: Partial<Record<ZoomLevel, string[]>> = {
+    0.5: ['builtInUltraWideCamera'],
+    2:   ['builtIn2xTelephotoCamera', 'builtInTelephotoCamera'],
+    5:   ['builtIn5xTelephotoCamera'],
+  }
+
+  function getIosLens(level: ZoomLevel): string | undefined {
+    if (Platform.OS !== 'ios') return undefined
+    const candidates = iosLensFor[level] ?? []
+    return candidates.find((l) => availableLenses.includes(l))
+  }
+
   function selectZoomLevel(level: ZoomLevel) {
     if (level === 0.5 && !hasUltrawide && Platform.OS === 'ios') return
     setZoomLevel(level)
-    const value = zoomLevelToValue(level)
+    const usingLens = getIosLens(level) !== undefined
+    // When switching to an optical lens, reset digital zoom to 0 so the
+    // lens itself provides the multiplier rather than stacking digital on top.
+    const value = usingLens ? 0 : zoomLevelToValue(level)
     setZoomValue(value)
     currentZoom.value = value
   }
@@ -484,7 +522,7 @@ export default function CameraScreen() {
     if (mode === 'video' || mode === 'scan') {
       setEnableTorch((t) => !t)
     } else {
-      const cycle: FlashMode[] = ['off', 'on', 'auto', 'screen']
+      const cycle: FlashMode[] = ['off', 'on', 'auto']
       setFlash((f) => cycle[(cycle.indexOf(f) + 1) % cycle.length] ?? 'off')
     }
   }
@@ -497,7 +535,7 @@ export default function CameraScreen() {
       off: 'flash-off-outline',
       on: 'flash',
       auto: 'flash-outline',
-      screen: 'phone-portrait-outline',
+      screen: 'flash-outline', // kept for type safety, never reached
     }
     return icons[flash]
   })()
@@ -514,10 +552,8 @@ export default function CameraScreen() {
   // ── Camera mode → expo mode prop ──────────────────────────────────────────────
   const cameraMode: CameraMode = mode === 'video' ? 'video' : 'picture'
 
-  // ── Lens selection (iOS ultrawide) ────────────────────────────────────────────
-  const selectedLens = Platform.OS === 'ios' && zoomLevel === 0.5 && hasUltrawide
-    ? 'builtInUltraWideCamera'
-    : undefined
+  // ── Lens selection (iOS optical zoom) ────────────────────────────────────────
+  const selectedLens = getIosLens(zoomLevel)
 
   // ── Permission screens ────────────────────────────────────────────────────────
   if (cameraPermission === null) {
@@ -584,7 +620,7 @@ export default function CameraScreen() {
             zoom={zoomValue}
             mode={cameraMode}
             enableTorch={enableTorch}
-            animateShutter={mode === 'photo'}
+            animateShutter={false}
             videoStabilizationMode="auto"
             onCameraReady={() => { setCameraReady(true) }}
             onAvailableLensesChanged={handleLensesChanged}
@@ -649,6 +685,13 @@ export default function CameraScreen() {
           </Pressable>
         </View>
       </View>
+
+      {/* Live zoom ratio — visible only while pinching */}
+      {isPinching && (
+        <View style={s.zoomIndicator} pointerEvents="none">
+          <Text style={s.zoomIndicatorText}>{zoomValueToLabel(zoomValue)}</Text>
+        </View>
+      )}
 
       {/* Zoom level selector */}
       <View style={s.zoomBar}>
@@ -842,6 +885,21 @@ const s = StyleSheet.create({
   },
 
   // Zoom bar
+  zoomIndicator: {
+    position: 'absolute',
+    bottom: 258,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+  },
+  zoomIndicatorText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFD60A',
+    letterSpacing: 0.3,
+  },
   zoomBar: {
     position: 'absolute',
     bottom: 210,

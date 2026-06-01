@@ -8,9 +8,11 @@ import {
   getScannedAssetIds,
   renameCluster,
   getAssetIdsForCluster,
+  getFirstEmbeddingLength,
+  clearAllFaceData,
   type FaceClusterRow,
 } from '@/lib/db'
-import { detectFacesInAsset } from '@/lib/faceDetector'
+import { detectFacesInAsset, EMBEDDING_LENGTH } from '@/lib/faceDetector'
 import { runClustering } from '@/lib/faceClusterer'
 
 const LAST_SCANNED_KEY = 'gathr.people.lastScanned'
@@ -70,6 +72,13 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
   startScan: async () => {
     set({ isScanning: true, scanProgress: 0 })
     try {
+      // Wipe stale data if embedding format changed (old 20-float coords → new 12-float distances).
+      const existingLen = await getFirstEmbeddingLength()
+      if (existingLen !== null && existingLen !== EMBEDDING_LENGTH) {
+        await clearAllFaceData()
+        await SecureStore.deleteItemAsync(LAST_SCANNED_KEY)
+      }
+
       const assets = await getRecentPhotos(2000)
       const total = assets.length
       let processed = 0
@@ -80,39 +89,27 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
       for (let i = 0; i < assets.length; i += BATCH_SIZE) {
         const batch = assets.slice(i, i + BATCH_SIZE)
 
-        for (const asset of batch) {
-          try {
-            if (scannedIds.has(asset.id)) {
-              processed++
-              continue
-            }
-
-            const uri = await asset.getUri()
-            if (!uri) {
-              processed++
-              continue
-            }
-
-            const faces = await detectFacesInAsset(uri)
-            for (const face of faces) {
-              await saveFaceEmbedding({
-                id: Crypto.randomUUID(),
-                asset_id: asset.id,
-                cluster_id: null,
-                embedding: JSON.stringify(face.embedding),
-                bbox_x: face.bbox.x,
-                bbox_y: face.bbox.y,
-                bbox_w: face.bbox.w,
-                bbox_h: face.bbox.h,
-                created_at: Date.now(),
-              })
-            }
-          } catch {
-            // Never throw — skip assets that fail
+        await Promise.allSettled(batch.map(async (asset) => {
+          if (scannedIds.has(asset.id)) return
+          const uri = await asset.getUri()
+          if (!uri) return
+          const faces = await detectFacesInAsset(uri)
+          for (const face of faces) {
+            await saveFaceEmbedding({
+              id: Crypto.randomUUID(),
+              asset_id: asset.id,
+              cluster_id: null,
+              embedding: JSON.stringify(face.embedding),
+              bbox_x: face.bbox.x,
+              bbox_y: face.bbox.y,
+              bbox_w: face.bbox.w,
+              bbox_h: face.bbox.h,
+              created_at: Date.now(),
+            })
           }
-          processed++
-        }
+        }))
 
+        processed += batch.length
         set({ scanProgress: Math.round((processed / total) * 90) })
         // Yield between batches so the UI stays responsive
         await new Promise<void>((r) => { setTimeout(r, 0) })

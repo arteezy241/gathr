@@ -5,11 +5,12 @@ import {
   persistClusteringResults,
   type FaceClusterRow,
 } from '@/lib/db'
+import { EMBEDDING_LENGTH } from '@/lib/faceDetector'
 
-// Embeddings with LANDMARK_KEYS.length * 2 floats are valid; anything else is a corrupt row.
-const EXPECTED_EMBEDDING_LENGTH = 20
-
-export const FACE_CLUSTER_THRESHOLD = 0.6
+// Euclidean threshold on L2-normalized 192-d MobileFaceNet embeddings.
+// Same person typically < 0.9, different people > 1.1.
+// Lower = fewer false merges; raise if the same person gets over-split.
+export const FACE_CLUSTER_THRESHOLD = 1.0
 
 export function euclideanDistance(a: number[], b: number[]): number {
   if (a.length === 0 || a.length !== b.length) return Infinity
@@ -50,7 +51,7 @@ export async function runClustering(): Promise<void> {
   // 3. Greedy nearest-neighbor assignment
   for (const emb of unclustered) {
     const vec = JSON.parse(emb.embedding) as number[]
-    if (vec.length !== EXPECTED_EMBEDDING_LENGTH) {
+    if (vec.length !== EMBEDDING_LENGTH) {
       // Corrupt or legacy row — delete so it stops polluting future clustering passes.
       corruptEmbeddingIds.push(emb.id)
       continue
@@ -60,7 +61,7 @@ export async function runClustering(): Promise<void> {
     let bestDist = FACE_CLUSTER_THRESHOLD
 
     for (const [cid, centroid] of clusterCentroids.entries()) {
-      if (centroid.length !== vec.length) continue
+      if (centroid.length !== EMBEDDING_LENGTH) continue
       const dist = euclideanDistance(centroid, vec)
       if (dist < bestDist) {
         bestDist = dist

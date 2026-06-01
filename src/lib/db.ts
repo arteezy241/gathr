@@ -496,6 +496,27 @@ export async function getScannedAssetIds(): Promise<string[]> {
   return rows.map((r) => r.asset_id)
 }
 
+export async function getFirstEmbeddingLength(): Promise<number | null> {
+  const db = await getDb()
+  const row = await db.getFirstAsync<{ embedding: string }>(
+    'SELECT embedding FROM face_embeddings LIMIT 1',
+    [],
+  )
+  if (row === null) return null
+  try {
+    const vec = JSON.parse(row.embedding) as number[]
+    return vec.length
+  } catch {
+    return null
+  }
+}
+
+export async function clearAllFaceData(): Promise<void> {
+  const db = await getDb()
+  await db.runAsync('DELETE FROM face_embeddings', [])
+  await db.runAsync('DELETE FROM face_clusters', [])
+}
+
 export async function hasEmbeddingForAsset(assetId: string): Promise<boolean> {
   const db = await getDb()
   const row = await db.getFirstAsync<{ id: string }>(
