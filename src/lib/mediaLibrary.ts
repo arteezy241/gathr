@@ -43,10 +43,11 @@ export async function getPhotosByDate(
   afterCursor?: string,
 ): Promise<Asset[]> {
   const offset = afterCursor !== undefined ? parseInt(afterCursor, 10) : 0
-  // Fetch both images and videos
+  // Sort by MODIFICATION_TIME (DATE_MODIFIED) — always set on Android, unlike
+  // CREATION_TIME (DATE_TAKEN) which requires EXIF and can be null for new photos.
   return new Query()
     .within(AssetField.MEDIA_TYPE, [MediaType.IMAGE, MediaType.VIDEO])
-    .orderBy({ key: AssetField.CREATION_TIME, ascending: false })
+    .orderBy({ key: AssetField.MODIFICATION_TIME, ascending: false })
     .offset(offset)
     .limit(limit)
     .exe()
@@ -71,7 +72,7 @@ export async function permanentlyDeleteByIds(assetIds: string[]): Promise<void> 
 export async function getRecentPhotos(limit: number): Promise<Asset[]> {
   return new Query()
     .within(AssetField.MEDIA_TYPE, [MediaType.IMAGE, MediaType.VIDEO])
-    .orderBy({ key: AssetField.CREATION_TIME, ascending: false })
+    .orderBy({ key: AssetField.MODIFICATION_TIME, ascending: false })
     .limit(limit)
     .exe()
 }
