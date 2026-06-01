@@ -6,6 +6,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { initDb } from '@/lib/db'
 import { ThemeProvider, useTheme } from '@/lib/themeContext'
+import { UndoToastProvider } from '@/components/ui/UndoToast'
+import { useTrashStore } from '@/store/trashStore'
 
 function AppStack() {
   const { isDark, colors } = useTheme()
@@ -28,6 +30,7 @@ function AppStack() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="camera" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="duplicates" options={{ title: 'Similar Photos', presentation: 'modal' }} />
+        <Stack.Screen name="trash" options={{ title: 'Recently Deleted' }} />
         <Stack.Screen name="memory/[id]" options={{ title: 'Memory' }} />
       </Stack>
     </>
@@ -37,13 +40,18 @@ function AppStack() {
 export default function RootLayout() {
   useEffect(() => {
     void initDb()
+    void useTrashStore.getState().loadTrash().then(() => {
+      void useTrashStore.getState().purgeExpired()
+    })
   }, [])
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <SafeAreaProvider>
-          <AppStack />
+          <UndoToastProvider>
+            <AppStack />
+          </UndoToastProvider>
         </SafeAreaProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

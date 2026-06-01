@@ -7,12 +7,14 @@ interface GalleryState {
   error: string | null
   hasNextPage: boolean
   endCursor: string | undefined
+  refreshKey: number
   setAssets: (assets: MediaLibraryAsset[]) => void
   appendAssets: (assets: MediaLibraryAsset[]) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   setPagination: (hasNextPage: boolean, endCursor: string | undefined) => void
   removeAssets: (ids: string[]) => void
+  invalidate: () => void
 }
 
 export const useGalleryStore = create<GalleryState>((set) => ({
@@ -21,6 +23,7 @@ export const useGalleryStore = create<GalleryState>((set) => ({
   error: null,
   hasNextPage: false,
   endCursor: undefined,
+  refreshKey: 0,
 
   setAssets: (assets) => {
     set({ assets })
@@ -46,6 +49,8 @@ export const useGalleryStore = create<GalleryState>((set) => ({
     const idSet = new Set(ids)
     set((state) => ({ assets: state.assets.filter((a) => !idSet.has(a.id)) }))
   },
+
+  invalidate: () => { set((state) => ({ refreshKey: state.refreshKey + 1 })) },
 }))
 
 export const galleryStore = useGalleryStore

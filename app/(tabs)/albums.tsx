@@ -194,6 +194,9 @@ export default function AlbumsScreen() {
           <Pressable onPress={() => { router.push('/duplicates') }} style={styles.importButton} hitSlop={8}>
             <Ionicons name="copy-outline" size={20} color={colors.accent} />
           </Pressable>
+          <Pressable onPress={() => { router.push('/trash') }} style={styles.importButton} hitSlop={8}>
+            <Ionicons name="trash-outline" size={20} color={colors.accent} />
+          </Pressable>
           <Pressable
             onPress={() => { void handleImport() }}
             style={styles.importButton}

@@ -1,20 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list'
 import { type Album, getAlbum, getAlbumAssetIds, updateAlbumCover, addAssetsToAlbum } from '@/lib/db'
 import { Asset, type MediaLibraryAsset } from '@/lib/mediaLibrary'
 import { useSelectionStore } from '@/store/selectionStore'
 import { useBiometricAuth } from '@/features/private-albums/hooks/useBiometricAuth'
-import { PhotoThumb } from '@/features/gallery/components/PhotoThumb'
+import { PhotoThumb, THUMB_SIZE } from '@/features/gallery/components/PhotoThumb'
 import { useTheme } from '@/lib/themeContext'
+import { hapticToggle } from '@/lib/haptics'
 import { radius, typography, type ThemeColors } from '@/lib/theme'
 import { PhotoPickerModal } from '@/features/albums/components/PhotoPickerModal'
 import { ScrollIndicator } from '@/components/ui/ScrollIndicator'
 
 const NUM_COLUMNS = 3
-const SCREEN_WIDTH = Dimensions.get('window').width
-const THUMB_SIZE = Math.floor(SCREEN_WIDTH / NUM_COLUMNS)
+
 
 // Android asset IDs are content URIs ending in a numeric media-store ID.
 // Higher number = more recently added to the device library.
@@ -36,7 +36,7 @@ export default function AlbumDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const { colors } = useTheme()
-  const { selectedIds } = useSelectionStore()
+  const { selectedIds, isSelecting } = useSelectionStore()
   const { isAuthenticated, isAuthenticating, authenticate } = useBiometricAuth()
 
   const [album, setAlbum] = useState<Album | null>(null)
@@ -49,7 +49,59 @@ export default function AlbumDetailScreen() {
   const listRef = useRef<FlashListRef<PhotoRow> | null>(null)
   const scrollY = useRef(new Animated.Value(0)).current
 
+  // ── Drag-to-select ──────────────────────────────────────────────────────
+  const isSelectingRef = useRef(isSelecting)
+  const selectedIdsRef = useRef(selectedIds)
+  const rowsRef = useRef<PhotoRow[]>([])
+  const scrollOffsetRef = useRef(0)
+  const listTopRef = useRef(0)
+  const listHeaderHeightRef = useRef(0)
+  const dragModeRef = useRef<'select' | 'deselect'>('select')
+  const draggedRef = useRef(new Set<string>())
+
+  useEffect(() => { isSelectingRef.current = isSelecting }, [isSelecting])
+  useEffect(() => { selectedIdsRef.current = selectedIds }, [selectedIds])
+
   const styles = useMemo(() => makeStyles(colors), [colors])
+
+  function getAssetAt(pageX: number, pageY: number): MediaLibraryAsset | null {
+    const relY = pageY - listTopRef.current + scrollOffsetRef.current - listHeaderHeightRef.current
+    if (relY < 0) return null
+    const rowIndex = Math.floor(relY / THUMB_SIZE)
+    const row = rowsRef.current[rowIndex]
+    if (row === undefined) return null
+    const col = Math.floor(pageX / THUMB_SIZE)
+    if (col < 0 || col >= NUM_COLUMNS) return null
+    return row.assets[col] ?? null
+  }
+
+  const panResponder = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: () => isSelectingRef.current,
+    onPanResponderGrant: (e) => {
+      draggedRef.current = new Set()
+      const asset = getAssetAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
+      if (asset === null) return
+      dragModeRef.current = selectedIdsRef.current.has(asset.id) ? 'deselect' : 'select'
+      draggedRef.current.add(asset.id)
+      useSelectionStore.getState().toggleSelect(asset.id)
+      useSelectionStore.getState().setLastSelected(asset.id)
+      hapticToggle()
+    },
+    onPanResponderMove: (e) => {
+      const asset = getAssetAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
+      if (asset === null || draggedRef.current.has(asset.id)) return
+      const alreadySelected = selectedIdsRef.current.has(asset.id)
+      if (
+        (dragModeRef.current === 'select' && !alreadySelected) ||
+        (dragModeRef.current === 'deselect' && alreadySelected)
+      ) {
+        draggedRef.current.add(asset.id)
+        useSelectionStore.getState().toggleSelect(asset.id)
+        useSelectionStore.getState().setLastSelected(asset.id)
+        hapticToggle()
+      }
+    },
+  })).current
 
   useEffect(() => {
     let cancelled = false
@@ -78,6 +130,8 @@ export default function AlbumDetailScreen() {
     }
     return result
   }, [albumAssets])
+
+  useEffect(() => { rowsRef.current = rows }, [rows])
 
   const currentAlbumAssetIds = useMemo(() => new Set(albumAssetIds), [albumAssetIds])
 
@@ -179,7 +233,11 @@ export default function AlbumDetailScreen() {
       ) : (
         <View
           style={styles.listContainer}
-          onLayout={(e) => { setContainerHeight(e.nativeEvent.layout.height) }}
+          onLayout={(e) => {
+            setContainerHeight(e.nativeEvent.layout.height)
+            e.target.measure((_x, _y, _w, _h, _px, py) => { listTopRef.current = py })
+          }}
+          {...(isSelecting ? panResponder.panHandlers : {})}
         >
           <FlashList
             ref={listRef}
@@ -187,12 +245,12 @@ export default function AlbumDetailScreen() {
             renderItem={renderRow}
             keyExtractor={keyExtractor}
             extraData={selectedIds}
-            onScroll={Animated.event(
-              [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-              { useNativeDriver: false },
-            )}
+            onScroll={(e) => {
+              scrollOffsetRef.current = e.nativeEvent.contentOffset.y
+              scrollY.setValue(e.nativeEvent.contentOffset.y)
+            }}
             onContentSizeChange={(_w, h) => { setContentHeight(h) }}
-            scrollEventThrottle={32}
+            scrollEventThrottle={16}
           />
           {containerHeight > 0 && contentHeight > containerHeight && (
             <ScrollIndicator

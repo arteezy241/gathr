@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react'
-import { Animated, Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Animated, Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
+import { Ionicons } from '@expo/vector-icons'
 import { type StoredTrip } from '@/lib/db'
 import { type MediaLibraryAsset } from '@/lib/mediaLibrary'
 import { useTheme } from '@/lib/themeContext'
@@ -11,6 +12,8 @@ interface Props {
   trip: StoredTrip
   coverAsset: MediaLibraryAsset | undefined
   onPress: () => void
+  onSaveAsAlbum?: () => void
+  isSavingAlbum?: boolean
 }
 
 const CARD_WIDTH = Dimensions.get('window').width - 32
@@ -20,7 +23,7 @@ function assetUri(asset: MediaLibraryAsset): string {
   return Platform.OS === 'ios' ? `ph://${asset.id}` : asset.id
 }
 
-export function TripCard({ trip, coverAsset, onPress }: Props) {
+export function TripCard({ trip, coverAsset, onPress, onSaveAsAlbum, isSavingAlbum = false }: Props) {
   const { colors } = useTheme()
   const styles = useMemo(() => makeStyles(colors), [colors])
   const scale = useRef(new Animated.Value(1)).current
@@ -54,6 +57,22 @@ export function TripCard({ trip, coverAsset, onPress }: Props) {
           {trip.subtitle}
         </Text>
       </GlassView>
+      {onSaveAsAlbum !== undefined && (
+        <Pressable
+          style={styles.saveAlbumBtn}
+          onPress={onSaveAsAlbum}
+          hitSlop={8}
+        >
+          {isSavingAlbum ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="albums-outline" size={12} color="#fff" />
+              <Text style={styles.saveAlbumText}>Save as Album</Text>
+            </>
+          )}
+        </Pressable>
+      )}
       </Animated.View>
     </Pressable>
   )
@@ -101,6 +120,23 @@ function makeStyles(colors: ThemeColors) {
       textShadowColor: 'rgba(0,0,0,0.5)',
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 3,
+    },
+    saveAlbumBtn: {
+      position: 'absolute',
+      top: spacing.sm,
+      right: spacing.sm,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: 'rgba(0,0,0,0.52)',
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 14,
+    },
+    saveAlbumText: {
+      fontSize: 11,
+      fontWeight: '600' as const,
+      color: '#fff',
     },
   })
 }

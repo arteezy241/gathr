@@ -154,6 +154,23 @@
 - `app/duplicates.tsx` — three states: pre-scan, scanning (progress bar), results (group cards); thumbnails with green "Keep" badge + red trash overlay on tap; per-group Delete N / Dismiss actions
 - Entry point: copy icon in Albums toolbar
 
+### Phase 20 — Bug Fixes & UX Polish
+- **DB init race fix** — `getDb()` now memoizes a single `openAndInit()` Promise; concurrent callers (layout + albums tab) all await the same Promise instead of firing duplicate `execAsync` calls; PRAGMAs run as separate `execAsync` calls before DDL to avoid rejection
+- **Memories race fix** — gallery screen now calls `loadTrips()` on mount to pre-populate trips from DB; memories reload after each `detectAndSaveTrips` pass via `memoriesGroupedAtRef` (tracks last `lastGroupedAt` value loaded for), so trip memory cards appear correctly
+- **Save as Album consolidated** — removed separate "Save as Album?" suggestion row above Trips & Events; "Save as Album" pill button now overlays each TripCard directly (top-right corner), visible only for unsaved trips; tapping saves + dismisses automatically
+- **Album drag-to-select** — album detail (`album/[id].tsx`) now has full PanResponder drag-to-select matching the gallery grid: `getAssetAt` hit-tests via `THUMB_SIZE` row height (no date headers), `isSelectingRef`/`selectedIdsRef`/`rowsRef` kept current via effects, `panHandlers` applied only when `isSelecting`
+
+### Phase 21 — Recycle Bin / Soft Delete
+- **`trash` table** in SQLite — `asset_id`, `original_uri`, `deleted_at`; added to `openAndInit()` alongside other tables; `IF NOT EXISTS` handles existing installs with no migration
+- **`trashStore`** — `moveToTrash` (adds to DB, does NOT delete from device), `restoreFromTrash` (removes from DB, calls `galleryStore.invalidate()`), `permanentlyDelete` (device delete via `permanentlyDeleteByIds` + DB removal), `emptyTrash` (bulk permanent delete + `clearTrash()`), `purgeExpired` (called on app start, permanently deletes anything older than 30 days)
+- **Soft delete intercept** — `photo/[id].tsx` `handleDelete` and `useSelectionActions.handleDelete` both call `moveToTrash` instead of `deleteAssets`; both fire `hapticWarning()`; no Alert confirmation (action is reversible)
+- **UndoToast** — `UndoToastProvider` wraps the app inside `SafeAreaProvider`; slides in from below FloatingTabBar (Animated.spring); auto-dismisses after 4s; `useUndoToast()` hook for any screen to trigger; new toast replaces any in-progress toast
+- **Gallery filtering** — `useGallery.fetchPage` reads `useTrashStore.getState().items` after every page fetch and filters out trashed IDs client-side; cursor arithmetic uses raw `results.length` so pagination stays correct
+- **Gallery refresh on restore** — `galleryStore.invalidate()` increments `refreshKey`; `useGallery` includes `refreshKey` in the `useEffect` deps for `fetchPage`, triggering a full refetch when an asset is restored from trash
+- **Trash screen** (`app/trash.tsx`) — 3-column grid with countdown badge (`Xd`, red when ≤ 5 days); long-press or tap opens peek modal with Restore / Delete Forever / Close; "Empty" button in header with Alert confirmation; empty state with icon + explanation copy
+- **Entry point** — trash icon in Albums tab toolbar alongside duplicate detector icon
+- **Startup purge** — `_layout.tsx` calls `loadTrash()` then `purgeExpired()` on mount after `initDb()`
+
 ---
 
 ## Key Architecture Decisions
@@ -178,6 +195,13 @@
 | `context: 'memory'` in photo viewer | Prevents viewer from using full gallery (where old photos may be paginated out); re-fetches that day's photos fresh |
 | `recordAsync` + 400ms settle delay for video | Native camera needs time to switch from picture to video mode before `recordAsync` is safe to call |
 | Zoom values calibrated small (0.015 for 2×, 0.04 for 5×) | Flagship Android (Xiaomi 15) has ~200× digital max; `expo-camera zoom` is 0–1 of device max |
+| `_dbPromise` memoizes `openAndInit()` in `db.ts` | Prevents concurrent `execAsync` rejections when `initDb()` is called from multiple entry points simultaneously |
+| `memoriesGroupedAtRef` tracks last `lastGroupedAt` loaded | Fires memories load on mount (undefined ≠ null) and again after trip detection (null ≠ timestamp), without reloading on unrelated `trips` reference changes |
+| "Save as Album" button embedded in TripCard | Removes redundant suggestion row; action lives where the trip is already displayed |
+| `moveToTrash` does NOT call `deleteAssetsAsync` | Asset stays in device library; only Gathr hides it. Permanent deletion is deferred to explicit user action or 30-day auto-purge |
+| Gallery filter reads `useTrashStore.getState()` (not subscribed) | Avoids re-rendering gallery on every trash operation; filter applies at fetch time, not on state change |
+| `galleryStore.invalidate()` / `refreshKey` | Clean decoupled signal for useGallery to refetch without trashStore knowing about the gallery |
+| `UndoToastProvider` inside `SafeAreaProvider` | Allows `useSafeAreaInsets()` inside the provider for correct bottom positioning above FloatingTabBar |
 
 ---
 
@@ -195,6 +219,7 @@ app/
     trips.tsx                   — all trips list
     albums.tsx                  — albums list, create, import, sort, duplicate entry point
   album/[id].tsx                — album detail, biometric gate, picker, ScrollIndicator
+  trash.tsx                     — recently deleted: 3-col grid, countdown badges, peek modal, empty trash
   trip/[id].tsx                 — trip detail, hero image, photo grid
   photo/[id].tsx                — full-screen viewer, RNGH zoom, video player, image editing
 
@@ -223,12 +248,14 @@ src/
     memoriesStore.ts
     tripSuggestionStore.ts
     duplicateStore.ts           — scan, deleteFromGroup, dismissGroup
+    trashStore.ts               — moveToTrash, restoreFromTrash, permanentlyDelete, emptyTrash, purgeExpired
   components/
     ui/
       Skeleton.tsx
       GlassView.tsx
       FloatingTabBar.tsx        — pill nav + selection mode (count + icons + Cancel)
       ScrollIndicator.tsx
+      UndoToast.tsx             — slide-up toast with 4s auto-dismiss; UndoToastProvider + useUndoToast()
   features/
     gallery/
       hooks/useGallery.ts
