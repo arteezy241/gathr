@@ -15,6 +15,7 @@ import {
 import {
   addListener as _addListener,
   removeAllListeners as _removeAllListeners,
+  createAssetAsync,
   type MediaLibraryAssetsChangeEvent,
 } from 'expo-media-library'
 
@@ -52,7 +53,10 @@ export async function getPhotosByDate(
 }
 
 export async function createAsset(uri: string): Promise<Asset> {
-  return Asset.create(uri)
+  // Use classic createAssetAsync — reliably saves to camera roll on Android.
+  // Asset.create() from /next wraps a temp-file path without actually persisting it.
+  const saved = await createAssetAsync(uri)
+  return new Asset(saved.id)
 }
 
 export async function deleteAssets(assets: MediaLibraryAsset[]): Promise<void> {

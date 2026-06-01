@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import * as SecureStore from 'expo-secure-store'
 import * as Crypto from 'expo-crypto'
+import * as Notifications from 'expo-notifications'
 import { getRecentPhotos } from '@/lib/mediaLibrary'
 import {
   saveFaceEmbedding,
@@ -124,6 +125,21 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
 
       const clusters = rawToClusters(await getAllClusters())
       set({ clusters, isScanning: false, scanProgress: 100, lastScannedAt: now })
+
+      // Notify user — useful when they navigated away during the scan
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'People scan complete',
+            body: clusters.length > 0
+              ? `Found ${String(clusters.length)} ${clusters.length === 1 ? 'person' : 'people'} in your library.`
+              : 'No recognizable faces found.',
+          },
+          trigger: null,
+        })
+      } catch {
+        // Notifications may not be permitted — not critical
+      }
     } catch {
       set({ isScanning: false })
     }

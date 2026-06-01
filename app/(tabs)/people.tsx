@@ -195,6 +195,19 @@ export default function PeopleScreen() {
       />
 
       <View style={[styles.screen, { paddingTop: Platform.OS === 'ios' ? 0 : insets.top }]}>
+        {/* Compact scanning banner — shown while scan runs in background */}
+        {isScanning && (
+          <View style={[styles.scanBanner, { backgroundColor: colors.surfaceElevated }]}>
+            <ActivityIndicator size="small" color={colors.accent} style={{ marginRight: 8 }} />
+            <Text style={[styles.scanBannerText, { color: colors.text }]}>
+              Scanning… {String(Math.round(scanProgress))}%
+            </Text>
+            <View style={[styles.scanBannerBar, { backgroundColor: colors.surface }]}>
+              <View style={[styles.scanBannerFill, { width: `${String(Math.round(scanProgress))}%` as `${number}%`, backgroundColor: colors.accent }]} />
+            </View>
+          </View>
+        )}
+
         {hasNeverScanned ? (
           // ── Never scanned state ──────────────────────────────────────────
           <View style={styles.centered}>
@@ -206,18 +219,6 @@ export default function PeopleScreen() {
             <Pressable style={[styles.scanBtn, { backgroundColor: colors.accent }]} onPress={handleStartScan}>
               <Text style={styles.scanBtnText}>Scan Library</Text>
             </Pressable>
-          </View>
-        ) : isScanning ? (
-          // ── Scanning state ───────────────────────────────────────────────
-          <View style={styles.centered}>
-            <Text style={styles.scanningLabel}>
-              Scanning photos…
-            </Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${String(Math.round(scanProgress))}%` as `${number}%` }]} />
-            </View>
-            <Text style={styles.progressLabel}>{String(Math.round(scanProgress))}%</Text>
-            <Text style={styles.scanningSubLabel}>This may take a few minutes.</Text>
           </View>
         ) : clusters.length === 0 ? (
           // ── No results after scan ────────────────────────────────────────
@@ -288,6 +289,27 @@ function makeStyles(colors: ThemeColors) {
     scanBtnText: {
       color: '#FFFFFF',
       ...typography.title,
+    },
+    scanBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      paddingVertical: 10,
+      gap: 4,
+    },
+    scanBannerText: {
+      ...typography.caption,
+      flex: 1,
+    },
+    scanBannerBar: {
+      width: 80,
+      height: 4,
+      borderRadius: 2,
+      overflow: 'hidden',
+    },
+    scanBannerFill: {
+      height: '100%',
+      borderRadius: 2,
     },
     scanningLabel: {
       ...typography.headline,
