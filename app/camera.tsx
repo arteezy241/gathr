@@ -643,7 +643,7 @@ export default function CameraScreen() {
       {/* Top bar */}
       <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
         {/* Close */}
-        <Pressable onPress={() => { if (isRecording) stopRecording(); router.back() }} style={s.circleBtn} hitSlop={12}>
+        <Pressable onPress={() => { if (isRecording) stopRecording(); router.back() }} style={({ pressed }) => [s.circleBtn, pressed && s.circleBtnPressed]} hitSlop={12}>
           <Ionicons name="close" size={22} color="#fff" />
         </Pressable>
 
@@ -665,7 +665,7 @@ export default function CameraScreen() {
         {/* Top right: controls row */}
         <View style={s.topRight}>
           {/* Grid toggle */}
-          <Pressable onPress={() => { setShowGrid((g) => !g) }} style={s.iconBtn} hitSlop={10}>
+          <Pressable onPress={() => { setShowGrid((g) => !g) }} style={({ pressed }) => [s.iconBtn, pressed && s.iconBtnPressed]} hitSlop={10}>
             <Ionicons
               name={showGrid ? 'grid' : 'grid-outline'}
               size={18}
@@ -674,13 +674,13 @@ export default function CameraScreen() {
           </Pressable>
           {/* Timer (photo + burst modes only) */}
           {(mode === 'photo' || mode === 'burst') && (
-            <Pressable onPress={cycleTimer} style={s.iconBtn} hitSlop={10}>
+            <Pressable onPress={cycleTimer} style={({ pressed }) => [s.iconBtn, pressed && s.iconBtnPressed]} hitSlop={10}>
               <Ionicons name={timerLabel} size={18} color={timerColor} />
               {timer > 0 && <Text style={s.timerBadge}>{String(timer)}</Text>}
             </Pressable>
           )}
           {/* Flash / torch */}
-          <Pressable onPress={cycleFlash} style={s.iconBtn} hitSlop={10}>
+          <Pressable onPress={cycleFlash} style={({ pressed }) => [s.iconBtn, pressed && s.iconBtnPressed]} hitSlop={10}>
             <Ionicons name={flashIcon} size={20} color={flash !== 'off' || enableTorch ? '#FFD60A' : '#fff'} />
           </Pressable>
         </View>
@@ -697,13 +697,14 @@ export default function CameraScreen() {
       <View style={s.zoomBar}>
         {ZOOM_LEVELS.map((level) => {
           const isActive = level === zoomLevel
-          const unavailable = level === 0.5 && Platform.OS === 'ios' && !hasUltrawide
+          // 0.5× is optical on iOS (ultrawide lens); Android has no lens-switch API
+          const unavailable = level === 0.5 && (Platform.OS !== 'ios' || !hasUltrawide)
           if (unavailable) return null
           return (
             <Pressable
               key={level}
               onPress={() => { selectZoomLevel(level) }}
-              style={[s.zoomBtn, isActive && s.zoomBtnActive]}
+              style={({ pressed }) => [s.zoomBtn, isActive && s.zoomBtnActive, pressed && s.zoomBtnPressed]}
               hitSlop={6}
             >
               <Text style={[s.zoomBtnText, isActive && s.zoomBtnTextActive]}>
@@ -732,7 +733,7 @@ export default function CameraScreen() {
                 setMode(key)
                 setScanResult(null)
               }}
-              style={s.modeItem}
+              style={({ pressed }) => [s.modeItem, pressed && s.modeItemPressed]}
               hitSlop={8}
             >
               <Text style={[s.modeText, isActive && s.modeTextActive]}>{label}</Text>
@@ -745,7 +746,7 @@ export default function CameraScreen() {
       {/* Bottom bar */}
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
         {/* Thumbnail / album picker */}
-        <Pressable onPress={handleAlbumPick} style={s.thumbSlot} hitSlop={8}>
+        <Pressable onPress={handleAlbumPick} style={({ pressed }) => [s.thumbSlot, pressed && s.thumbSlotPressed]} hitSlop={8}>
           {lastUri !== null ? (
             <Image source={{ uri: lastUri }} style={s.thumb} contentFit="cover" transition={120} />
           ) : (
@@ -772,7 +773,7 @@ export default function CameraScreen() {
         {/* Flip camera */}
         <Pressable
           onPress={() => { if (!isRecording) setFacing((f) => (f === 'back' ? 'front' : 'back')) }}
-          style={[s.circleBtn, isRecording && s.disabledBtn]}
+          style={({ pressed }) => [s.circleBtn, pressed && s.circleBtnPressed, isRecording && s.disabledBtn]}
           hitSlop={12}
           disabled={isRecording}
         >
@@ -831,6 +832,12 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  circleBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   timerBadge: {
     position: 'absolute',
@@ -919,6 +926,9 @@ const s = StyleSheet.create({
   zoomBtnActive: {
     backgroundColor: 'rgba(255,255,255,0.2)',
   },
+  zoomBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
   zoomBtnText: {
     fontSize: 13,
     fontWeight: '600',
@@ -943,6 +953,9 @@ const s = StyleSheet.create({
   modeItem: {
     alignItems: 'center',
     gap: 4,
+  },
+  modeItemPressed: {
+    opacity: 0.6,
   },
   modeText: {
     fontSize: 13,
@@ -980,6 +993,9 @@ const s = StyleSheet.create({
     height: 54,
     borderRadius: 12,
     overflow: 'visible',
+  },
+  thumbSlotPressed: {
+    opacity: 0.7,
   },
   thumb: {
     width: 54,
