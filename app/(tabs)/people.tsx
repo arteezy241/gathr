@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Platform,
   Pressable,
@@ -17,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Path } from 'react-native-svg'
 import { usePeopleStore, shouldRescan, type PersonCluster } from '@/store/peopleStore'
+import { useSheet } from '@/components/ui/SheetProvider'
 import { useTheme } from '@/lib/themeContext'
 import { radius, spacing, typography, type ThemeColors } from '@/lib/theme'
 import { hapticTap } from '@/lib/haptics'
@@ -137,6 +137,7 @@ export default function PeopleScreen() {
   const { clusters, isScanning, scanProgress, lastScannedAt, startScan, renamePerson, loadClusters } =
     usePeopleStore()
   const styles = useMemo(() => makeStyles(colors), [colors])
+  const { showConfirm } = useSheet()
 
   const hasNeverScanned = lastScannedAt === null && !isScanning
 
@@ -145,10 +146,12 @@ export default function PeopleScreen() {
   }
 
   function handleRescan() {
-    Alert.alert('Re-scan Library', 'This will re-scan your entire library and may take several minutes. Continue?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Scan', onPress: handleStartScan },
-    ])
+    showConfirm(
+      'Re-scan Library',
+      'This will re-scan your entire library and may take several minutes.',
+      handleStartScan,
+      { confirmLabel: 'Scan' },
+    )
   }
 
   const renderItem = useCallback(({ item, index }: ListRenderItemInfo<PersonCluster>) => (

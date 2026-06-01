@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Dimensions, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Dimensions, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Stack, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -18,6 +18,7 @@ import { PermissionsEmptyState } from '@/components/ui/PermissionsEmptyState'
 import { useTheme } from '@/lib/themeContext'
 import { usePermissions } from '@/hooks/usePermissions'
 import { radius, spacing, type ThemeColors } from '@/lib/theme'
+import { useSheet } from '@/components/ui/SheetProvider'
 
 const GAP = 10
 const HORIZONTAL_PAD = 16
@@ -45,6 +46,7 @@ export default function AlbumsScreen() {
   type SortKey = 'name' | 'newest' | 'oldest' | 'count'
   const [sortKey, setSortKey] = useState<SortKey>('newest')
   const dbInitialized = useRef(false)
+  const { showInfo, showSheet } = useSheet()
 
   const bottomPad = insets.bottom + PILL_MARGIN_BOTTOM + PILL_HEIGHT + 8
   const styles = useMemo(() => makeStyles(colors, insets.top, bottomPad), [colors, insets.top, bottomPad])
@@ -74,7 +76,7 @@ export default function AlbumsScreen() {
       if (album.isPrivate) {
         const success = await authenticate(`Unlock "${album.name}"`)
         if (!success) {
-          Alert.alert('Authentication Required', 'Biometric authentication is required to open this album.')
+          showInfo('Authentication Required', 'Biometric authentication is required to open this album.')
           return
         }
       }
@@ -96,30 +98,29 @@ export default function AlbumsScreen() {
       const result = await importNativeAlbums()
       await loadAlbums()
       hapticSuccess()
-      Alert.alert(
+      showInfo(
         'Import Complete',
         result.imported > 0
           ? `Imported ${String(result.imported)} album${result.imported === 1 ? '' : 's'} from your device.`
           : 'No new albums found to import.',
       )
     } catch (e) {
-      Alert.alert('Import Failed', e instanceof Error ? e.message : 'Could not import albums.')
+      showInfo('Import Failed', e instanceof Error ? e.message : 'Could not import albums.')
     } finally {
       setIsImporting(false)
     }
   }
 
   function handleSort() {
-    const options: Array<{ text: string; onPress: () => void }> = [
-      { text: 'Name (A–Z)', onPress: () => { setSortKey('name') } },
-      { text: 'Newest first', onPress: () => { setSortKey('newest') } },
-      { text: 'Oldest first', onPress: () => { setSortKey('oldest') } },
-      { text: 'Most photos', onPress: () => { setSortKey('count') } },
-    ]
-    Alert.alert('Sort Albums', undefined, [
-      ...options.map((o) => ({ text: o.text, onPress: o.onPress })),
-      { text: 'Cancel', style: 'cancel' as const },
-    ])
+    showSheet({
+      title: 'Sort Albums',
+      actions: [
+        { label: 'Name (A–Z)', onPress: () => { setSortKey('name') } },
+        { label: 'Newest first', onPress: () => { setSortKey('newest') } },
+        { label: 'Oldest first', onPress: () => { setSortKey('oldest') } },
+        { label: 'Most photos', onPress: () => { setSortKey('count') } },
+      ],
+    })
   }
 
   const sortedAlbums = useMemo(() => {

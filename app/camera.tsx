@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Dimensions,
   Platform,
@@ -27,6 +26,7 @@ import { useSharedValue } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAlbumStore } from '@/store/albumStore'
+import { useSheet } from '@/components/ui/SheetProvider'
 import { createAsset } from '@/lib/mediaLibrary'
 import { addAssetsToAlbum, updateAlbumCover } from '@/lib/db'
 import { hapticTap, hapticSuccess, hapticAction } from '@/lib/haptics'
@@ -228,6 +228,7 @@ export default function CameraScreen() {
   const [audioPermission, requestAudioPermission] = useMicrophonePermissions()
   const { albums } = useAlbumStore()
   const publicAlbums = albums.filter((a) => !a.isPrivate)
+  const { showInfo, showSheet } = useSheet()
 
   // ── Core state ──────────────────────────────────────────────────────────────
   const [mode, setMode] = useState<ShootingMode>('photo')
@@ -368,7 +369,7 @@ export default function CameraScreen() {
       }
       hapticSuccess()
     } catch (e) {
-      Alert.alert('Capture failed', e instanceof Error ? e.message : 'Could not take photo.')
+      showInfo('Capture failed', e instanceof Error ? e.message : 'Could not take photo.')
     } finally {
       setCapturing(false)
     }
@@ -416,7 +417,7 @@ export default function CameraScreen() {
     if (audioPermission !== null && !audioPermission.granted) {
       const result = await requestAudioPermission()
       if (!result.granted) {
-        Alert.alert('Microphone Required', 'Allow microphone access to record video with audio.')
+        showInfo('Microphone Required', 'Allow microphone access to record video with audio.')
         return
       }
     }
@@ -436,7 +437,7 @@ export default function CameraScreen() {
       }
     } catch (e) {
       setIsRecording(false)
-      Alert.alert('Recording failed', e instanceof Error ? e.message : 'Could not record video.')
+      showInfo('Recording failed', e instanceof Error ? e.message : 'Could not record video.')
     }
   }
 
@@ -463,21 +464,19 @@ export default function CameraScreen() {
   // ── Album picker ──────────────────────────────────────────────────────────────
   function handleAlbumPick() {
     if (publicAlbums.length === 0) {
-      Alert.alert('No Albums', 'Create an album from the Albums tab first.')
+      showInfo('No Albums', 'Create an album from the Albums tab first.')
       return
     }
-    Alert.alert(
-      'Save to Album',
-      undefined,
-      [
-        { text: 'None', onPress: () => { setSelectedAlbumId(null) } },
+    showSheet({
+      title: 'Save to Album',
+      actions: [
+        { label: 'None', onPress: () => { setSelectedAlbumId(null) } },
         ...publicAlbums.map((a) => ({
-          text: a.name + (selectedAlbumId === a.id ? ' ✓' : ''),
+          label: a.name + (selectedAlbumId === a.id ? ' ✓' : ''),
           onPress: () => { setSelectedAlbumId(a.id) },
         })),
-        { text: 'Cancel', style: 'cancel' as const },
       ],
-    )
+    })
   }
 
   // ── Flash/torch cycle ─────────────────────────────────────────────────────────

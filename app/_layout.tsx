@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { initDb } from '@/lib/db'
 import { ThemeProvider, useTheme } from '@/lib/themeContext'
 import { UndoToastProvider } from '@/components/ui/UndoToast'
+import { SheetProvider } from '@/components/ui/SheetProvider'
 import { useTrashStore } from '@/store/trashStore'
 import { hasCompletedOnboarding } from '@/lib/onboarding'
 
@@ -63,9 +64,11 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <SafeAreaProvider>
-          <UndoToastProvider>
-            <AppStack />
-          </UndoToastProvider>
+          <SheetProvider>
+            <UndoToastProvider>
+              <AppStack />
+            </UndoToastProvider>
+          </SheetProvider>
         </SafeAreaProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

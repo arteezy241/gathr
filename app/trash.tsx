@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Alert,
   Animated,
   Dimensions,
   Modal,
@@ -19,6 +18,7 @@ import { useTrashStore, type TrashItem } from '@/store/trashStore'
 import { useTheme } from '@/lib/themeContext'
 import { spacing, typography, type ThemeColors } from '@/lib/theme'
 import { hapticWarning, hapticSuccess, hapticTap } from '@/lib/haptics'
+import { useSheet } from '@/components/ui/SheetProvider'
 
 const NUM_COLS = 3
 const SCREEN_W = Dimensions.get('window').width
@@ -198,6 +198,7 @@ export default function TrashScreen() {
   const insets = useSafeAreaInsets()
   const styles = useMemo(() => makeStyles(colors, insets.top), [colors, insets.top])
   const { items, isLoading, loadTrash, permanentlyDelete, restoreFromTrash, emptyTrash } = useTrashStore()
+  const { showConfirm } = useSheet()
   const [peekItem, setPeekItem] = useState<TrashItem | null>(null)
 
   useEffect(() => {
@@ -215,33 +216,21 @@ export default function TrashScreen() {
   function handleEmptyTrash() {
     if (items.length === 0) return
     hapticWarning()
-    Alert.alert(
+    showConfirm(
       'Empty Trash',
       `Permanently delete all ${String(items.length)} ${items.length === 1 ? 'photo' : 'photos'}? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete All',
-          style: 'destructive',
-          onPress: () => { void emptyTrash() },
-        },
-      ],
+      () => { void emptyTrash() },
+      { confirmLabel: 'Delete All', destructive: true },
     )
   }
 
   function handleDeleteForever(assetId: string) {
     hapticWarning()
-    Alert.alert(
+    showConfirm(
       'Delete Forever',
       'This photo will be permanently deleted and cannot be recovered.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => { void permanentlyDelete(assetId) },
-        },
-      ],
+      () => { void permanentlyDelete(assetId) },
+      { confirmLabel: 'Delete', destructive: true },
     )
   }
 
