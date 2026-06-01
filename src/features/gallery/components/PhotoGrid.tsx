@@ -45,9 +45,10 @@ function getItemType(item: ListItem): string {
 interface Props {
   listHeader?: ReactElement
   contentBottomPad?: number
+  emptyComponent?: ReactElement
 }
 
-export function PhotoGrid({ listHeader, contentBottomPad }: Props) {
+export function PhotoGrid({ listHeader, contentBottomPad, emptyComponent }: Props) {
   const router = useRouter()
   const { colors } = useTheme()
   const { assets, isLoading, error, hasNextPage, loadMore } = useGallery()
@@ -255,11 +256,11 @@ export function PhotoGrid({ listHeader, contentBottomPad }: Props) {
         onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y }}
         scrollEventThrottle={16}
         ListEmptyComponent={
-          isLoading ? null : (
+          isLoading ? null : (emptyComponent ?? (
             <View style={styles.centered}>
               <Text style={{ color: colors.textTertiary, textAlign: 'center' }}>No photos found</Text>
             </View>
-          )
+          ))
         }
         ListFooterComponent={
           isLoading && assets.length > 0

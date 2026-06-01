@@ -8,7 +8,10 @@ import { hapticDone } from '@/lib/haptics'
 import { useGalleryStore } from '@/store/galleryStore'
 import { useTripStore } from '@/store/tripStore'
 import { TripCard } from '@/features/gallery/components/TripCard'
+import { TripsEmptyState } from '@/features/gallery/components/TripsEmptyState'
+import { PermissionsEmptyState } from '@/components/ui/PermissionsEmptyState'
 import { useTheme } from '@/lib/themeContext'
+import { usePermissions } from '@/hooks/usePermissions'
 import { PILL_HEIGHT, PILL_MARGIN_BOTTOM } from '@/components/ui/FloatingTabBar'
 import { radius, spacing, typography, type ThemeColors } from '@/lib/theme'
 
@@ -16,6 +19,7 @@ export default function TripsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { colors } = useTheme()
+  const { granted, requesting } = usePermissions()
   const { trips, isLoading, loadTrips, detectAndSaveTrips } = useTripStore()
   const assets = useGalleryStore((s) => s.assets)
   const [isRegrouping, setIsRegrouping] = useState(false)
@@ -77,17 +81,14 @@ export default function TripsScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.screen}>
-        {isLoading ? (
+        {!requesting && !granted ? (
+          <PermissionsEmptyState />
+        ) : isLoading ? (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={colors.accent} />
           </View>
         ) : trips.length === 0 ? (
-          <View style={styles.centered}>
-            <Text style={styles.emptyTitle}>No trips detected yet</Text>
-            <Text style={styles.emptyBody}>
-              Gathr groups your photos automatically after you take a burst of photos over multiple days
-            </Text>
-          </View>
+          <TripsEmptyState />
         ) : (
           <FlashList
             data={filteredTrips}
@@ -139,20 +140,6 @@ function makeStyles(colors: ThemeColors, topPad: number, bottomPad: number) {
       alignItems: 'center',
       justifyContent: 'center',
       padding: spacing.xl,
-    },
-    emptyTitle: {
-      ...typography.title,
-      fontSize: 18,
-      color: colors.text,
-      textAlign: 'center',
-      marginBottom: 10,
-    },
-    emptyBody: {
-      ...typography.body,
-      fontSize: 14,
-      color: colors.textTertiary,
-      textAlign: 'center',
-      lineHeight: 20,
     },
     listHeader: {
       padding: spacing.md,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Animated, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -13,9 +13,11 @@ import { SelectionBar } from '@/features/gallery/components/SelectionBar'
 import { TripsSection } from '@/features/gallery/components/TripsSection'
 import { MemoriesSection } from '@/features/gallery/components/MemoriesSection'
 import { PhotoSearchResults } from '@/features/gallery/components/PhotoSearchResults'
+import { GalleryEmptyState } from '@/features/gallery/components/GalleryEmptyState'
+import { PermissionsEmptyState } from '@/components/ui/PermissionsEmptyState'
 import { useTheme } from '@/lib/themeContext'
 import { PILL_HEIGHT, PILL_MARGIN_BOTTOM } from '@/components/ui/FloatingTabBar'
-import { radius, spacing, typography, type ThemeColors } from '@/lib/theme'
+import { radius, type ThemeColors } from '@/lib/theme'
 
 function GalleryHeader() {
   return (
@@ -29,7 +31,7 @@ function GalleryHeader() {
 export default function GalleryScreen() {
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
-  const { granted, requesting, request } = usePermissions()
+  const { granted, requesting } = usePermissions()
   const assets = useGalleryStore((s) => s.assets)
   const { trips, lastGroupedAt, detectAndSaveTrips, loadTrips } = useTripStore()
   const { load: loadMemories } = useMemoriesStore()
@@ -86,27 +88,12 @@ export default function GalleryScreen() {
     }
   }, [trips, loadSuggestions])
 
-  if (requesting) {
+  if (!requesting && !granted) {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.centered} />
-      </>
-    )
-  }
-
-  if (!granted) {
-    return (
-      <>
-        <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.centered}>
-          <Text style={styles.permissionTitle}>Photo Access Required</Text>
-          <Text style={styles.permissionBody}>
-            Gathr needs access to your photo library to display and organize your photos.
-          </Text>
-          <TouchableOpacity style={styles.permissionButton} onPress={() => { void request() }}>
-            <Text style={styles.permissionButtonText}>Allow Access</Text>
-          </TouchableOpacity>
+        <View style={styles.screen}>
+          <PermissionsEmptyState />
         </View>
       </>
     )
@@ -146,7 +133,7 @@ export default function GalleryScreen() {
 
         {searchActive
           ? <PhotoSearchResults query={searchQuery} contentBottomPad={bottomPad} />
-          : <PhotoGrid listHeader={<GalleryHeader />} contentBottomPad={bottomPad} />
+          : <PhotoGrid listHeader={<GalleryHeader />} contentBottomPad={bottomPad} emptyComponent={<GalleryEmptyState />} />
         }
 
         {/* Search icon — only shown when not searching */}
@@ -205,36 +192,6 @@ function makeStyles(colors: ThemeColors, topPad: number) {
       backgroundColor: colors.surfaceElevated,
       alignItems: 'center',
       justifyContent: 'center',
-    },
-    centered: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: spacing.xl,
-      backgroundColor: colors.background,
-    },
-    permissionTitle: {
-      ...typography.headline,
-      color: colors.text,
-      marginBottom: spacing.sm,
-      textAlign: 'center',
-    },
-    permissionBody: {
-      ...typography.body,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      lineHeight: 22,
-      marginBottom: 28,
-    },
-    permissionButton: {
-      backgroundColor: colors.accent,
-      paddingHorizontal: 28,
-      paddingVertical: 14,
-      borderRadius: 12,
-    },
-    permissionButtonText: {
-      color: '#FFFFFF',
-      ...typography.title,
     },
   })
 }

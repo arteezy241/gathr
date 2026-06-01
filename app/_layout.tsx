@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
-import { Platform } from 'react-native'
-import { Stack } from 'expo-router'
+import { useEffect, useState } from 'react'
+import { Platform, View } from 'react-native'
+import { Stack, useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
@@ -8,9 +8,21 @@ import { initDb } from '@/lib/db'
 import { ThemeProvider, useTheme } from '@/lib/themeContext'
 import { UndoToastProvider } from '@/components/ui/UndoToast'
 import { useTrashStore } from '@/store/trashStore'
+import { hasCompletedOnboarding } from '@/lib/onboarding'
 
 function AppStack() {
   const { isDark, colors } = useTheme()
+  const router = useRouter()
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    void hasCompletedOnboarding().then((done) => {
+      if (!done) router.replace('/onboarding')
+      setReady(true)
+    })
+  }, [])
+
+  if (!ready) return <View style={{ flex: 1, backgroundColor: colors.background }} />
 
   return (
     <>
@@ -28,6 +40,7 @@ function AppStack() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen name="camera" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="duplicates" options={{ title: 'Similar Photos', presentation: 'modal' }} />
         <Stack.Screen name="trash" options={{ title: 'Recently Deleted' }} />

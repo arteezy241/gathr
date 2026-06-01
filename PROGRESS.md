@@ -16,6 +16,7 @@
 - **Image editing:** expo-image-manipulator
 - **Notifications:** expo-notifications
 - **Location:** expo-location (reverse geocoding)
+- **SVG:** react-native-svg (inline illustrations)
 - **Language:** TypeScript (strict), ESLint, Prettier
 
 ---
@@ -171,6 +172,21 @@
 - **Entry point** — trash icon in Albums tab toolbar alongside duplicate detector icon
 - **Startup purge** — `_layout.tsx` calls `loadTrash()` then `purgeExpired()` on mount after `initDb()`
 
+### Phase 22 — Onboarding Flow & Empty States
+- **`src/lib/onboarding.ts`** — `hasCompletedOnboarding()` / `markOnboardingComplete()` backed by `expo-secure-store` key `gathr.onboarding.complete`
+- **Onboarding gate** — `AppStack` in `_layout.tsx` checks SecureStore on mount; shows theme-colored blank while checking; redirects to `/onboarding` via `router.replace` if not done; gate runs once per install
+- **`app/onboarding.tsx`** — 4-slide horizontal FlatList with `pagingEnabled`; tracks current index via `onViewableItemsChanged` (ref-stable callback, 50% viewability threshold); animated dot indicator (8px → 24px spring on active slide); "Skip" button top-right (hidden on slide 4); "Next →" ghost pill on slides 1–3; "Allow Access" / "Not Now" CTA stack on slide 4
+  - Slide 1: animated 3×3 Skeleton mosaic + "Gathr" wordmark (48px bold)
+  - Slide 2: SVG map pin + calendar, "Trips & Memories"
+  - Slide 3: SVG padlock + keyhole, "Private Albums"
+  - Slide 4: permission CTA — "Allow Access" calls `requestPermissions` then `markOnboardingComplete`; "Not Now" skips to tabs without requesting
+- **`PermissionsEmptyState`** — reusable component (`src/components/ui/PermissionsEmptyState.tsx`); SVG photo frame with lock overlay; "Open Settings" button via `Linking.openSettings()`; shown in all three tabs when permission not granted
+- **`GalleryEmptyState`** — SVG camera outline; "Open Camera" button; passed to `PhotoGrid` via new `emptyComponent` prop (avoids timing flash; PhotoGrid's `ListEmptyComponent` handles `isLoading` guard internally)
+- **`TripsEmptyState`** — SVG mountain + sun; no button (trips appear automatically)
+- **`AlbumsEmptyState`** — SVG folder outline; "Create Album" button calls parent's `setSheetVisible(true)` via `onCreateAlbum` prop
+- **Tab wiring** — all three tabs show `PermissionsEmptyState` when `!requesting && !granted` (permission check takes priority); gallery passes `emptyComponent` to `PhotoGrid`; trips and albums replace their inline text empty states with the new components
+- **`react-native-svg`** added to dependencies (was assumed transitive but not present)
+
 ---
 
 ## Key Architecture Decisions
@@ -218,6 +234,7 @@ app/
     index.tsx                   — gallery screen, search bar, GalleryHeader wiring
     trips.tsx                   — all trips list
     albums.tsx                  — albums list, create, import, sort, duplicate entry point
+  onboarding.tsx                — 4-slide first-launch flow: Welcome / Trips / Private / Permissions
   album/[id].tsx                — album detail, biometric gate, picker, ScrollIndicator
   trash.tsx                     — recently deleted: 3-col grid, countdown badges, peek modal, empty trash
   trip/[id].tsx                 — trip detail, hero image, photo grid
@@ -226,6 +243,7 @@ app/
 src/
   lib/
     mediaLibrary.ts             — expo-media-library gateway
+    onboarding.ts               — hasCompletedOnboarding / markOnboardingComplete via expo-secure-store
     db.ts                       — SQLite: albums, album_assets, trips (+ place), favorites, trip_album_dismissed
     tripGrouper.ts              — time-gap grouping + reverse geocoding
     geocoding.ts                — getPlaceName via expo-location.reverseGeocodeAsync
@@ -256,11 +274,12 @@ src/
       FloatingTabBar.tsx        — pill nav + selection mode (count + icons + Cancel)
       ScrollIndicator.tsx
       UndoToast.tsx             — slide-up toast with 4s auto-dismiss; UndoToastProvider + useUndoToast()
+      PermissionsEmptyState.tsx — SVG photo-frame+lock; "Open Settings" via Linking; used in all three tabs
   features/
     gallery/
       hooks/useGallery.ts
       components/
-        PhotoGrid.tsx
+        PhotoGrid.tsx           — accepts optional emptyComponent prop (passed to FlashList ListEmptyComponent)
         PhotoThumb.tsx
         DateSectionHeader.tsx
         SelectionBar.tsx        — "Select All" pill only; action logic in useSelectionActions
@@ -270,10 +289,13 @@ src/
         MemoryCard.tsx
         MemoriesSection.tsx
         PhotoSearchResults.tsx  — date-parsing search, 350ms debounce
+        GalleryEmptyState.tsx   — SVG camera; "Open Camera" button
+        TripsEmptyState.tsx     — SVG mountain+sun; no button
     albums/components/
       AlbumCard.tsx
       CreateAlbumSheet.tsx
       PhotoPickerModal.tsx
+      AlbumsEmptyState.tsx      — SVG folder; "Create Album" button via onCreateAlbum prop
     private-albums/hooks/
       useBiometricAuth.ts
   hooks/
