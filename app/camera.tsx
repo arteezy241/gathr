@@ -26,6 +26,7 @@ import { useSharedValue } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAlbumStore } from '@/store/albumStore'
+import { useGalleryStore } from '@/store/galleryStore'
 import { useSheet } from '@/components/ui/SheetProvider'
 import { createAsset } from '@/lib/mediaLibrary'
 import { addAssetsToAlbum, updateAlbumCover } from '@/lib/db'
@@ -451,6 +452,7 @@ export default function CameraScreen() {
         await addAssetsToAlbum(selectedAlbumId, [asset.id])
         await updateAlbumCover(selectedAlbumId, asset.id)
       }
+      useGalleryStore.getState().invalidate()
       hapticSuccess()
     } catch (e) {
       showInfo('Capture failed', e instanceof Error ? e.message : 'Could not take photo.')
@@ -490,6 +492,7 @@ export default function CameraScreen() {
       const lastId = assetIds[assetIds.length - 1]
       if (lastId !== undefined) await updateAlbumCover(selectedAlbumId, lastId)
     }
+    useGalleryStore.getState().invalidate()
     hapticSuccess()
     setBurstCount(0)
   }
@@ -517,6 +520,7 @@ export default function CameraScreen() {
           await addAssetsToAlbum(selectedAlbumId, [asset.id])
           await updateAlbumCover(selectedAlbumId, asset.id)
         }
+        useGalleryStore.getState().invalidate()
         hapticSuccess()
       }
     } catch (e) {
