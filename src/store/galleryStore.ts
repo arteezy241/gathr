@@ -14,6 +14,7 @@ interface GalleryState {
   setError: (error: string | null) => void
   setPagination: (hasNextPage: boolean, endCursor: string | undefined) => void
   removeAssets: (ids: string[]) => void
+  prependAssets: (assets: MediaLibraryAsset[]) => void
   invalidate: () => void
 }
 
@@ -48,6 +49,14 @@ export const useGalleryStore = create<GalleryState>((set) => ({
   removeAssets: (ids) => {
     const idSet = new Set(ids)
     set((state) => ({ assets: state.assets.filter((a) => !idSet.has(a.id)) }))
+  },
+
+  prependAssets: (newAssets) => {
+    set((state) => {
+      const existingIds = new Set(state.assets.map((a) => a.id))
+      const toAdd = newAssets.filter((a) => !existingIds.has(a.id))
+      return toAdd.length > 0 ? { assets: [...toAdd, ...state.assets] } : {}
+    })
   },
 
   invalidate: () => { set((state) => ({ refreshKey: state.refreshKey + 1 })) },

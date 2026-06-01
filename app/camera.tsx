@@ -452,7 +452,7 @@ export default function CameraScreen() {
         await addAssetsToAlbum(selectedAlbumId, [asset.id])
         await updateAlbumCover(selectedAlbumId, asset.id)
       }
-      useGalleryStore.getState().invalidate()
+      useGalleryStore.getState().prependAssets([asset])
       hapticSuccess()
     } catch (e) {
       showInfo('Capture failed', e instanceof Error ? e.message : 'Could not take photo.')
@@ -477,22 +477,25 @@ export default function CameraScreen() {
         break
       }
     }
-    const assetIds: string[] = []
+    const savedAssets: import('@/lib/mediaLibrary').MediaLibraryAsset[] = []
     for (const uri of uris) {
       try {
         const asset = await createAsset(uri)
-        assetIds.push(asset.id)
+        savedAssets.push(asset)
         setLastUri(uri)
       } catch {
         // skip failed saves
       }
     }
-    if (selectedAlbumId !== null && assetIds.length > 0) {
+    if (savedAssets.length > 0) {
+      useGalleryStore.getState().prependAssets(savedAssets)
+    }
+    if (selectedAlbumId !== null && savedAssets.length > 0) {
+      const assetIds = savedAssets.map((a) => a.id)
       await addAssetsToAlbum(selectedAlbumId, assetIds)
       const lastId = assetIds[assetIds.length - 1]
       if (lastId !== undefined) await updateAlbumCover(selectedAlbumId, lastId)
     }
-    useGalleryStore.getState().invalidate()
     hapticSuccess()
     setBurstCount(0)
   }
@@ -516,11 +519,11 @@ export default function CameraScreen() {
       if (result !== undefined && result.uri.length > 0) {
         setLastUri(result.uri)
         const asset = await createAsset(result.uri)
+        useGalleryStore.getState().prependAssets([asset])
         if (selectedAlbumId !== null) {
           await addAssetsToAlbum(selectedAlbumId, [asset.id])
           await updateAlbumCover(selectedAlbumId, asset.id)
         }
-        useGalleryStore.getState().invalidate()
         hapticSuccess()
       }
     } catch (e) {
