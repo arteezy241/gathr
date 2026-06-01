@@ -106,6 +106,24 @@ async function openAndInit(): Promise<SQLiteDatabase> {
       original_uri TEXT NOT NULL,
       deleted_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS face_embeddings (
+      id TEXT PRIMARY KEY,
+      asset_id TEXT NOT NULL,
+      cluster_id TEXT,
+      embedding TEXT NOT NULL,
+      bbox_x REAL, bbox_y REAL, bbox_w REAL, bbox_h REAL,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS face_clusters (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      cover_asset_id TEXT,
+      centroid TEXT NOT NULL,
+      photo_count INTEGER DEFAULT 0,
+      updated_at INTEGER NOT NULL
+    );
   `)
   try {
     await db.execAsync('ALTER TABLE trips ADD COLUMN place TEXT;')
@@ -360,4 +378,116 @@ export async function purgeExpiredTrash(beforeMs: number): Promise<string[]> {
 export async function clearTrash(): Promise<void> {
   const db = await getDb()
   await db.runAsync('DELETE FROM trash', [])
+}
+
+// ── Face Detection ────────────────────────────────────────────────────────────
+
+export interface FaceEmbeddingRow {
+  id: string
+  asset_id: string
+  cluster_id: string | null
+  embedding: string       // JSON float array
+  bbox_x: number
+  bbox_y: number
+  bbox_w: number
+  bbox_h: number
+  created_at: number
+}
+
+export interface FaceClusterRow {
+  id: string
+  name: string | null
+  cover_asset_id: string | null
+  centroid: string        // JSON float array (running average)
+  photo_count: number
+  updated_at: number
+}
+
+export async function saveFaceEmbedding(row: FaceEmbeddingRow): Promise<void> {
+  const db = await getDb()
+  await db.runAsync(
+    `INSERT OR REPLACE INTO face_embeddings
+      (id, asset_id, cluster_id, embedding, bbox_x, bbox_y, bbox_w, bbox_h, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [row.id, row.asset_id, row.cluster_id ?? null, row.embedding,
+      row.bbox_x, row.bbox_y, row.bbox_w, row.bbox_h, row.created_at],
+  )
+}
+
+export async function getEmbeddingsWithoutCluster(): Promise<FaceEmbeddingRow[]> {
+  const db = await getDb()
+  return db.getAllAsync<FaceEmbeddingRow>(
+    'SELECT * FROM face_embeddings WHERE cluster_id IS NULL',
+    [],
+  )
+}
+
+export async function getAllClusters(): Promise<FaceClusterRow[]> {
+  const db = await getDb()
+  return db.getAllAsync<FaceClusterRow>(
+    'SELECT * FROM face_clusters ORDER BY photo_count DESC',
+    [],
+  )
+}
+
+export async function updateEmbeddingCluster(id: string, clusterId: string): Promise<void> {
+  const db = await getDb()
+  await db.runAsync('UPDATE face_embeddings SET cluster_id = ? WHERE id = ?', [clusterId, id])
+}
+
+export async function upsertCluster(row: FaceClusterRow): Promise<void> {
+  const db = await getDb()
+  await db.runAsync(
+    `INSERT OR REPLACE INTO face_clusters
+      (id, name, cover_asset_id, centroid, photo_count, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)`,
+    [row.id, row.name ?? null, row.cover_asset_id ?? null, row.centroid, row.photo_count, row.updated_at],
+  )
+}
+
+export async function renameCluster(clusterId: string, name: string): Promise<void> {
+  const db = await getDb()
+  await db.runAsync(
+    'UPDATE face_clusters SET name = ?, updated_at = ? WHERE id = ?',
+    [name, Date.now(), clusterId],
+  )
+}
+
+export async function getAssetIdsForCluster(clusterId: string): Promise<string[]> {
+  const db = await getDb()
+  const rows = await db.getAllAsync<{ asset_id: string }>(
+    'SELECT DISTINCT asset_id FROM face_embeddings WHERE cluster_id = ?',
+    [clusterId],
+  )
+  return rows.map((r) => r.asset_id
+  )
+}
+
+export async function persistClusteringResults(
+  clusterRows: FaceClusterRow[],
+  embeddingAssignments: { id: string; clusterId: string }[],
+): Promise<void> {
+  const db = await getDb()
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    for (const c of clusterRows) {
+      await txn.runAsync(
+        `INSERT OR REPLACE INTO face_clusters
+          (id, name, cover_asset_id, centroid, photo_count, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+        [c.id, c.name ?? null, c.cover_asset_id ?? null, c.centroid, c.photo_count, c.updated_at],
+      )
+    }
+    for (const { id, clusterId } of embeddingAssignments) {
+      await txn.runAsync('UPDATE face_embeddings SET cluster_id = ? WHERE id = ?', [clusterId, id])
+    }
+  })
+}
+
+export async function hasEmbeddingForAsset(assetId: string): Promise<boolean> {
+  const db = await getDb()
+  const row = await db.getFirstAsync<{ id: string }>(
+    'SELECT id FROM face_embeddings WHERE asset_id = ? LIMIT 1',
+    [assetId],
+  )
+  return row !== null
 }

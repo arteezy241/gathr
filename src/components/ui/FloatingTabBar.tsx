@@ -35,6 +35,7 @@ export function FloatingTabBar({ state, navigation }: TabBarProps) {
     index: { active: 'images-sharp', inactive: 'images' },
     trips: { active: 'map', inactive: 'map-outline' },
     albums: { active: 'albums-sharp', inactive: 'albums' },
+    people: { active: 'people', inactive: 'people-outline' },
   }
 
   return (
@@ -198,7 +199,7 @@ const styles = StyleSheet.create({
   segmentTab: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 17,
   },
