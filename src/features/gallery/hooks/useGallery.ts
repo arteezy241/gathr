@@ -37,6 +37,7 @@ export function useGallery(): GalleryResult {
 
     try {
       const results = await getPhotosByDate(PAGE_SIZE, cursor)
+      console.log('[gallery] fetchPage got', results.length, 'results, first id:', results[0]?.id)
 
       // Filter out soft-deleted (trashed) assets
       const trashedIds = new Set(useTrashStore.getState().items.map((i) => i.assetId))

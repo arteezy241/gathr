@@ -448,13 +448,20 @@ export default function CameraScreen() {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.92, skipProcessing: false })
       setLastUri(photo.uri)
       const asset = await createAsset(photo.uri)
+      console.log('[camera] saved asset id:', asset.id, 'from uri:', photo.uri)
       if (selectedAlbumId !== null) {
         await addAssetsToAlbum(selectedAlbumId, [asset.id])
         await updateAlbumCover(selectedAlbumId, asset.id)
       }
       hapticSuccess()
-      // Delay re-fetch so MediaStore has time to index the new photo
-      setTimeout(() => { useGalleryStore.getState().invalidate() }, 2000)
+      setTimeout(() => {
+        console.log('[camera] invalidating gallery at 2s')
+        useGalleryStore.getState().invalidate()
+      }, 2000)
+      setTimeout(() => {
+        console.log('[camera] invalidating gallery at 5s')
+        useGalleryStore.getState().invalidate()
+      }, 5000)
     } catch (e) {
       showInfo('Capture failed', e instanceof Error ? e.message : 'Could not take photo.')
     } finally {
