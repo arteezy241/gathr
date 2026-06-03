@@ -7,10 +7,16 @@ import {
 } from '@/lib/db'
 import { EMBEDDING_LENGTH } from '@/lib/faceDetector'
 
-// Euclidean threshold on L2-normalized 192-d MobileFaceNet embeddings.
-// Same person typically < 0.9, different people > 1.1.
-// Lower = fewer false merges; raise if the same person gets over-split.
-export const FACE_CLUSTER_THRESHOLD = 1.0
+// Two-pass clustering thresholds on L2-normalized 192-d MobileFaceNet embeddings.
+//
+// Pass 1 — tight seed formation (greedy NN):
+//   impure seed (strangers in same cluster) → lower SEED_THRESHOLD
+export const SEED_THRESHOLD = 0.7
+//
+// Pass 2 — centroid merge (pairwise on stable averages):
+//   strangers merged into one person   → lower MERGE_THRESHOLD (not SEED)
+//   same person split across clusters  → raise MERGE_THRESHOLD
+export const MERGE_THRESHOLD = 0.72
 
 export function euclideanDistance(a: number[], b: number[]): number {
   if (a.length === 0 || a.length !== b.length) return Infinity
@@ -48,7 +54,9 @@ export async function runClustering(): Promise<void> {
   const embeddingAssignments: { id: string; clusterId: string }[] = []
   const corruptEmbeddingIds: string[] = []
 
-  // 3. Greedy nearest-neighbor assignment
+  // 3. Pass 1 — tight greedy NN seed formation (SEED_THRESHOLD)
+  //    Each seed cluster should be pure (confident same person).
+  //    One person may produce several seeds if pose/lighting varies — pass 2 merges them.
   for (const emb of unclustered) {
     const vec = JSON.parse(emb.embedding) as number[]
     if (vec.length !== EMBEDDING_LENGTH) {
@@ -58,7 +66,7 @@ export async function runClustering(): Promise<void> {
     }
 
     let bestClusterId: string | null = null
-    let bestDist = FACE_CLUSTER_THRESHOLD
+    let bestDist = SEED_THRESHOLD
 
     for (const [cid, centroid] of clusterCentroids.entries()) {
       if (centroid.length !== EMBEDDING_LENGTH) continue
@@ -72,7 +80,7 @@ export async function runClustering(): Promise<void> {
     const bboxArea = emb.bbox_w * emb.bbox_h
 
     if (bestClusterId === null) {
-      // Create new cluster
+      // No nearby seed — start a new one
       const newId = Crypto.randomUUID()
       clusterCentroids.set(newId, vec)
       clusterMaxBboxArea.set(newId, bboxArea)
@@ -86,7 +94,7 @@ export async function runClustering(): Promise<void> {
       })
       embeddingAssignments.push({ id: emb.id, clusterId: newId })
     } else {
-      // Assign to existing cluster, update centroid as running average
+      // Assign to nearest seed, update centroid as running average
       const existing = clusterUpdates.get(bestClusterId)
       if (existing === undefined) continue
       const newCount = existing.photo_count + 1
@@ -94,7 +102,6 @@ export async function runClustering(): Promise<void> {
       const newCentroid = updateCentroid(oldCentroid, vec, newCount)
       clusterCentroids.set(bestClusterId, newCentroid)
 
-      // Update cover to the face with the largest bbox area
       const prevMaxArea = clusterMaxBboxArea.get(bestClusterId) ?? 0
       const newCoverAssetId = bboxArea > prevMaxArea ? emb.asset_id : existing.cover_asset_id
       if (bboxArea > prevMaxArea) clusterMaxBboxArea.set(bestClusterId, bboxArea)
@@ -110,6 +117,60 @@ export async function runClustering(): Promise<void> {
     }
   }
 
-  // 4. Persist all updates in a single transaction
+  // 4. Pass 2 — centroid merge (MERGE_THRESHOLD)
+  //    Compare stable cluster centroids pairwise. Safer than comparing raw embeddings
+  //    because centroids average out pose/lighting noise.
+  //    Repeat until no pair merges (handles transitivity: A↔B, B↔C → A=B=C).
+  //    Tuning: strangers merged → lower MERGE_THRESHOLD  |  same person split → raise MERGE_THRESHOLD
+  let anyMerged = true
+  while (anyMerged) {
+    anyMerged = false
+    const ids = Array.from(clusterUpdates.keys())
+    outer: for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const idA = ids[i]!
+        const idB = ids[j]!
+        const centA = clusterCentroids.get(idA)
+        const centB = clusterCentroids.get(idB)
+        if (!centA || !centB) continue
+        if (euclideanDistance(centA, centB) >= MERGE_THRESHOLD) continue
+
+        // Merge B into A — weighted centroid, sum counts, pick larger-bbox cover
+        const clA = clusterUpdates.get(idA)!
+        const clB = clusterUpdates.get(idB)!
+        const newCount = clA.photo_count + clB.photo_count
+        const newCentroid = centA.map((v, k) =>
+          (v * clA.photo_count + (centB[k] ?? 0) * clB.photo_count) / newCount,
+        )
+        const areaA = clusterMaxBboxArea.get(idA) ?? 0
+        const areaB = clusterMaxBboxArea.get(idB) ?? 0
+        const newCover = areaB > areaA ? clB.cover_asset_id : clA.cover_asset_id
+
+        clusterCentroids.set(idA, newCentroid)
+        clusterMaxBboxArea.set(idA, Math.max(areaA, areaB))
+        clusterUpdates.set(idA, {
+          ...clA,
+          cover_asset_id: newCover,
+          centroid: JSON.stringify(newCentroid),
+          photo_count: newCount,
+          updated_at: Date.now(),
+        })
+
+        // Remap all of B's embedding assignments to A
+        for (const assignment of embeddingAssignments) {
+          if (assignment.clusterId === idB) assignment.clusterId = idA
+        }
+
+        clusterCentroids.delete(idB)
+        clusterMaxBboxArea.delete(idB)
+        clusterUpdates.delete(idB)
+
+        anyMerged = true
+        break outer  // ids array is stale after deletion — restart the sweep
+      }
+    }
+  }
+
+  // 5. Persist all updates in a single transaction
   await persistClusteringResults(Array.from(clusterUpdates.values()), embeddingAssignments, corruptEmbeddingIds)
 }

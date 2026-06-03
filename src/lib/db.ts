@@ -124,6 +124,14 @@ async function openAndInit(): Promise<SQLiteDatabase> {
       photo_count INTEGER DEFAULT 0,
       updated_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS scan_progress (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      current INTEGER NOT NULL DEFAULT 0,
+      total INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'idle',
+      updated_at INTEGER NOT NULL DEFAULT 0
+    );
   `)
   try {
     await db.execAsync('ALTER TABLE trips ADD COLUMN place TEXT;')
@@ -517,6 +525,12 @@ export async function clearAllFaceData(): Promise<void> {
   await db.runAsync('DELETE FROM face_clusters', [])
 }
 
+export async function resetClustering(): Promise<void> {
+  const db = await getDb()
+  await db.runAsync('DELETE FROM face_clusters', [])
+  await db.runAsync('UPDATE face_embeddings SET cluster_id = NULL', [])
+}
+
 export async function hasEmbeddingForAsset(assetId: string): Promise<boolean> {
   const db = await getDb()
   const row = await db.getFirstAsync<{ id: string }>(
@@ -524,4 +538,30 @@ export async function hasEmbeddingForAsset(assetId: string): Promise<boolean> {
     [assetId],
   )
   return row !== null
+}
+
+export type ScanStatus = 'idle' | 'scanning' | 'clustering' | 'done' | 'error'
+
+export interface ScanProgress {
+  current: number
+  total: number
+  status: ScanStatus
+}
+
+export async function writeScanProgress(current: number, total: number, status: ScanStatus): Promise<void> {
+  const db = await getDb()
+  await db.runAsync(
+    'INSERT OR REPLACE INTO scan_progress (id, current, total, status, updated_at) VALUES (1, ?, ?, ?, ?)',
+    [current, total, status, Date.now()],
+  )
+}
+
+export async function readScanProgress(): Promise<ScanProgress> {
+  const db = await getDb()
+  const row = await db.getFirstAsync<{ current: number; total: number; status: string }>(
+    'SELECT current, total, status FROM scan_progress WHERE id = 1',
+    [],
+  )
+  if (!row) return { current: 0, total: 0, status: 'idle' }
+  return { current: row.current, total: row.total, status: row.status as ScanStatus }
 }
