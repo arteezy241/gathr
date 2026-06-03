@@ -134,7 +134,7 @@ function PersonCard({ cluster, index, colors, onRename }: PersonCardProps) {
 export default function PeopleScreen() {
   const insets = useSafeAreaInsets()
   const { colors } = useTheme()
-  const { clusters, isScanning, scanProgress, lastScannedAt, startScan, renamePerson, loadClusters } =
+  const { clusters, isScanning, scanProgress, lastScannedAt, startScan, recluster, wipeAndRescan, renamePerson, loadClusters } =
     usePeopleStore()
   const styles = useMemo(() => makeStyles(colors), [colors])
   const { showConfirm } = useSheet()
@@ -240,9 +240,17 @@ export default function PeopleScreen() {
             keyExtractor={keyExtractor}
             numColumns={NUM_COLUMNS}
             ListHeaderComponent={
-              <Pressable style={[styles.rescanPill, { backgroundColor: colors.surfaceElevated }]} onPress={handleRescan}>
-                <Text style={[styles.rescanPillText, { color: colors.accent }]}>Re-scan Library</Text>
-              </Pressable>
+              <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginBottom: spacing.sm }}>
+                <Pressable style={[styles.rescanPill, { backgroundColor: colors.surfaceElevated, marginBottom: 0 }]} onPress={() => { void recluster() }}>
+                  <Text style={[styles.rescanPillText, { color: colors.accent }]}>Re-cluster</Text>
+                </Pressable>
+                <Pressable style={[styles.rescanPill, { backgroundColor: colors.surfaceElevated, marginBottom: 0 }]} onPress={handleRescan}>
+                  <Text style={[styles.rescanPillText, { color: colors.accent }]}>Re-scan Library</Text>
+                </Pressable>
+                <Pressable style={[styles.rescanPill, { backgroundColor: colors.surfaceElevated, marginBottom: 0 }]} onPress={() => { void wipeAndRescan() }}>
+                  <Text style={[styles.rescanPillText, { color: '#FF3B30' }]}>Wipe & Rescan</Text>
+                </Pressable>
+              </View>
             }
             contentContainerStyle={{
               padding: spacing.md,
