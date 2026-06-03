@@ -128,16 +128,17 @@ export async function runClustering(): Promise<void> {
     const ids = Array.from(clusterUpdates.keys())
     outer: for (let i = 0; i < ids.length; i++) {
       for (let j = i + 1; j < ids.length; j++) {
-        const idA = ids[i]!
-        const idB = ids[j]!
+        const idA = ids[i] as string
+        const idB = ids[j] as string
         const centA = clusterCentroids.get(idA)
         const centB = clusterCentroids.get(idB)
         if (!centA || !centB) continue
         if (euclideanDistance(centA, centB) >= MERGE_THRESHOLD) continue
 
         // Merge B into A — weighted centroid, sum counts, pick larger-bbox cover
-        const clA = clusterUpdates.get(idA)!
-        const clB = clusterUpdates.get(idB)!
+        const clA = clusterUpdates.get(idA)
+        const clB = clusterUpdates.get(idB)
+        if (!clA || !clB) continue
         const newCount = clA.photo_count + clB.photo_count
         const newCentroid = centA.map((v, k) =>
           (v * clA.photo_count + (centB[k] ?? 0) * clB.photo_count) / newCount,

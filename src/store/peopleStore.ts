@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { Platform, NativeModules } from 'react-native'
-import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake'
 import * as SecureStore from 'expo-secure-store'
 import * as Crypto from 'expo-crypto'
 import * as Notifications from 'expo-notifications'
@@ -126,7 +125,6 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
     set({ isScanning: true, scanProgress: 0, scanError: null })
 
     const finish = async () => {
-      deactivateKeepAwake('people-scan')
       await fgStop()
       const now = Date.now()
       await SecureStore.setItemAsync(LAST_SCANNED_KEY, String(now))
@@ -146,7 +144,6 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
     }
 
     try {
-      await activateKeepAwakeAsync('people-scan')
       await Notifications.requestPermissionsAsync()
       await fgStart('Running in the background…')
       await writeScanProgress(0, 0, 'scanning')
@@ -158,7 +155,7 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
       }
 
       const allAssets = await getRecentPhotos(2000)
-      const assets = allAssets.filter((a) => !(a.uri ?? '').match(/\.(mp4|mov|m4v|3gp)$/i))
+      const assets = allAssets.filter((a) => !a.id.includes('/video/'))
       const total = assets.length
       const scannedIds = new Set(await getScannedAssetIds())
       let processed = 0
@@ -196,7 +193,6 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
       await finish()
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      deactivateKeepAwake('people-scan')
       await fgStop()
       set({ isScanning: false, scanError: msg })
     }
