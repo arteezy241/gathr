@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { Platform, NativeModules } from 'react-native'
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake'
 import * as SecureStore from 'expo-secure-store'
 import * as Crypto from 'expo-crypto'
 import * as Notifications from 'expo-notifications'
@@ -11,15 +13,61 @@ import {
   getAssetIdsForCluster,
   getFirstEmbeddingLength,
   clearAllFaceData,
+  resetClustering,
+  writeScanProgress,
   type FaceClusterRow,
 } from '@/lib/db'
 import { detectFacesInAsset, EMBEDDING_LENGTH } from '@/lib/faceDetector'
 import { runClustering } from '@/lib/faceClusterer'
 
+const FgNative: {
+  startService: (config: object) => Promise<void>
+  updateNotification: (config: object) => Promise<void>
+  stopService: () => Promise<void>
+} | null = Platform.OS === 'android' ? NativeModules.ForegroundService as typeof FgNative : null
+
+const FG_NOTIF_ID = 9901
+
+async function fgStart(message: string) {
+  if (!FgNative) return
+  try {
+    await FgNative.startService({
+      id: FG_NOTIF_ID,
+      title: 'Gathr — Scanning Faces',
+      message,
+      ServiceType: 'specialUse',
+      icon: 'ic_launcher',
+      importance: 'high',
+      ongoing: true,
+      number: '1',
+    })
+    console.log('[FgService] startService OK')
+  } catch (e) {
+    console.warn('[FgService] startService failed:', e)
+  }
+}
+
+async function fgUpdate(message: string) {
+  try {
+    await FgNative?.updateNotification({
+      id: FG_NOTIF_ID,
+      title: 'Gathr — Scanning Faces',
+      message,
+      ServiceType: 'specialUse',
+      icon: 'ic_launcher',
+      importance: 'high',
+      ongoing: true,
+    })
+  } catch { /* non-critical */ }
+}
+
+async function fgStop() {
+  try { await FgNative?.stopService() } catch { /* non-critical */ }
+}
+
 const LAST_SCANNED_KEY = 'gathr.people.lastScanned'
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
 const BATCH_SIZE = 10
-// Only show clusters with at least 3 photos
 const MIN_CLUSTER_SIZE = 3
 
 export interface PersonCluster {
@@ -32,13 +80,16 @@ export interface PersonCluster {
 type PeopleState = {
   clusters: PersonCluster[]
   isScanning: boolean
-  scanProgress: number      // 0–100
+  scanProgress: number
   lastScannedAt: number | null
+  scanError: string | null
 }
 
 type PeopleActions = {
   loadClusters: () => Promise<void>
   startScan: () => Promise<void>
+  recluster: () => Promise<void>
+  wipeAndRescan: () => Promise<void>
   renamePerson: (clusterId: string, name: string) => Promise<void>
   getPhotosForPerson: (clusterId: string) => Promise<string[]>
 }
@@ -61,6 +112,7 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
   isScanning: false,
   scanProgress: 0,
   lastScannedAt: null,
+  scanError: null,
 
   loadClusters: async () => {
     const raw = await getAllClusters()
@@ -71,25 +123,48 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
   },
 
   startScan: async () => {
-    set({ isScanning: true, scanProgress: 0 })
+    set({ isScanning: true, scanProgress: 0, scanError: null })
+
+    const finish = async () => {
+      deactivateKeepAwake('people-scan')
+      await fgStop()
+      const now = Date.now()
+      await SecureStore.setItemAsync(LAST_SCANNED_KEY, String(now))
+      const clusters = rawToClusters(await getAllClusters())
+      set({ clusters, isScanning: false, scanProgress: 100, lastScannedAt: now })
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'People scan complete',
+            body: clusters.length > 0
+              ? `Found ${String(clusters.length)} ${clusters.length === 1 ? 'person' : 'people'} in your library.`
+              : 'No recognizable faces found.',
+          },
+          trigger: null,
+        })
+      } catch { /* non-critical */ }
+    }
+
     try {
-      // Wipe stale data if embedding format changed (old 20-float coords → new 12-float distances).
+      await activateKeepAwakeAsync('people-scan')
+      await Notifications.requestPermissionsAsync()
+      await fgStart('Running in the background…')
+      await writeScanProgress(0, 0, 'scanning')
+
       const existingLen = await getFirstEmbeddingLength()
       if (existingLen !== null && existingLen !== EMBEDDING_LENGTH) {
         await clearAllFaceData()
         await SecureStore.deleteItemAsync(LAST_SCANNED_KEY)
       }
 
-      const assets = await getRecentPhotos(2000)
+      const allAssets = await getRecentPhotos(2000)
+      const assets = allAssets.filter((a) => !(a.uri ?? '').match(/\.(mp4|mov|m4v|3gp)$/i))
       const total = assets.length
-      let processed = 0
-
-      // Load all already-scanned asset IDs in one query instead of N per-asset round-trips
       const scannedIds = new Set(await getScannedAssetIds())
+      let processed = 0
 
       for (let i = 0; i < assets.length; i += BATCH_SIZE) {
         const batch = assets.slice(i, i + BATCH_SIZE)
-
         await Promise.allSettled(batch.map(async (asset) => {
           if (scannedIds.has(asset.id)) return
           const uri = await asset.getUri()
@@ -109,39 +184,40 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
             })
           }
         }))
-
         processed += batch.length
-        set({ scanProgress: Math.round((processed / total) * 90) })
-        // Yield between batches so the UI stays responsive
+        const pct = Math.round((processed / total) * 90)
+        set({ scanProgress: pct })
+        await fgUpdate(`Scanning photo ${String(processed)} of ${String(total)} (${String(pct)}%)`)
         await new Promise<void>((r) => { setTimeout(r, 0) })
       }
 
-      set({ scanProgress: 92 })
+      set({ scanProgress: 95 })
       await runClustering()
-      set({ scanProgress: 98 })
+      await finish()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      deactivateKeepAwake('people-scan')
+      await fgStop()
+      set({ isScanning: false, scanError: msg })
+    }
+  },
 
-      const now = Date.now()
-      await SecureStore.setItemAsync(LAST_SCANNED_KEY, String(now))
+  wipeAndRescan: async () => {
+    await clearAllFaceData()
+    await SecureStore.deleteItemAsync(LAST_SCANNED_KEY)
+    set({ clusters: [], lastScannedAt: null })
+    await usePeopleStore.getState().startScan()
+  },
 
+  recluster: async () => {
+    set({ isScanning: true, scanProgress: 0, scanError: null })
+    try {
+      await resetClustering()
+      await runClustering()
       const clusters = rawToClusters(await getAllClusters())
-      set({ clusters, isScanning: false, scanProgress: 100, lastScannedAt: now })
-
-      // Notify user — useful when they navigated away during the scan
-      try {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: 'People scan complete',
-            body: clusters.length > 0
-              ? `Found ${String(clusters.length)} ${clusters.length === 1 ? 'person' : 'people'} in your library.`
-              : 'No recognizable faces found.',
-          },
-          trigger: null,
-        })
-      } catch {
-        // Notifications may not be permitted — not critical
-      }
-    } catch {
-      set({ isScanning: false })
+      set({ clusters, isScanning: false, scanProgress: 100 })
+    } catch (e) {
+      set({ isScanning: false, scanError: e instanceof Error ? e.message : String(e) })
     }
   },
 

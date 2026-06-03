@@ -69,7 +69,8 @@
           "enableCoreMLDelegate": true
         }
       ],
-      "expo-font"
+      "expo-font",
+      "./plugins/withForegroundService"
     ],
     "extra": {
       "router": {},
