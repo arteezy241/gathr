@@ -198,6 +198,31 @@
 - **`app/photo/[id].tsx`** — added `'person'` to `PhotoContext` union; `getAssetIdsForCluster(contextId)` loads asset list same pattern as album/trip contexts
 - **`FloatingTabBar`** — People added as fourth segment (icon: `people` / `people-outline`); per-segment `paddingHorizontal` reduced 14 → 10 to fit four tabs
 
+### Phase 24 — UI Polish & Alert Cleanup
+- **`app/people/[id].tsx`** — removed last remaining `Alert.prompt` call; unified to cross-platform TextInput modal (matching Android pattern used throughout app)
+- **`app/camera.tsx`** — mode switcher (`ModeItem`) now animates with Animated spring scale + dot opacity; `({ pressed }) =>` style function on every `Pressable` for tactile press feedback; mode change fires `expo-haptics` impact
+- **Camera 0.5× ultrawide** — hidden on Android (`Platform.OS !== 'ios'`) since `builtInUltraWideCamera` lens selection is iOS-only; zoom tap buttons show 1×/2×/5× only on Android
+- **Camera flash cycle** — removed `'screen'` mode; cycles `['off','on','auto']` only; `animateShutter={false}` removes white flash on capture
+- **Zoom calibration** — `case 2: return 0.15`, `case 5: return 0.4` for flagship Android (Xiaomi 15 / Galaxy S25 range); iOS uses `selectedLens` switch
+
+### Phase 25 — Camera Save + Background People Scan
+- **Camera → Gallery fix** — `createAsset()` now calls `_createAssetAsync` from `expo-media-library/legacy` (SDK 56 deprecated the /next class method); gallery sorted by `MODIFICATION_TIME` instead of `CREATION_TIME` (DATE_TAKEN is null for EXIF-less photos on Android); `groupAssetsByDate` falls back to `getModificationTime()` when `getCreationTime()` returns null; 2-second delayed `galleryStore.invalidate()` after capture bridges Android MediaStore indexing latency
+- **Background People scan** — scan no longer blocks the UI; compact banner (`ActivityIndicator` + `Scanning… X%` + mini progress bar) replaces full-screen progress overlay; user can switch tabs freely during scan; `expo-notifications` push fires on completion
+- **Face embedding engine** — replaced `@react-native-ml-kit/face-detection` landmark approach with `react-native-fast-tflite` + MobileFaceNet TFLite model (input [1,112,112,3] float32, output [1,192] L2-normalized); lazy `require()` pattern prevents crash when native module absent; `ImageManipulator.manipulate().crop().resize().renderAsync()` new API (replaces deprecated `manipulateAsync`)
+- **Cluster threshold** — `FACE_CLUSTER_THRESHOLD` raised to 1.0 for L2-normalized 192-d embeddings
+- **Gradle build** — downgraded `gradle-wrapper.properties` from 9.3.1 → 8.13 (IBM_SEMERU removed in Gradle 9+; AGP minimum is 8.13); `expo-font` + `expo-constants` added as explicit deps (missing peer deps)
+- **`removeAllListeners` scope fix** — `useGallery.ts` cleanup now calls only `sub.remove()` (was calling global `removeAllListeners()` which killed all media-library listeners app-wide)
+
+### Phase 26 — True HeadlessJS Background Scan
+- **`@supersami/rn-foreground-service@2.2.5`** — foreground service library added; bypassed its `start()`/`stop()` wrapper (which internally calls `runTask`) in favour of calling `NativeModules.ForegroundService` directly to decouple service start from task launch
+- **`android/app/src/main/AndroidManifest.xml`** — manually added `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_SPECIAL_USE` permissions and declared both `ForegroundService` + `ForegroundServiceTask` services with `android:foregroundServiceType="specialUse"` (Android 15 / Xiaomi 15 HyperOS 2.0 removed `dataSync` type entirely)
+- **`plugins/withForegroundService.js`** — config plugin created (`@expo/config-plugins` `withAndroidManifest`); wired into `app.json` plugins array; note: in bare workflow the manifest must also be patched directly
+- **`src/lib/db.ts`** — added `scan_progress` table (single-row, `id CHECK (id = 1)`); exported `ScanProgress` type, `ScanStatus` union, `writeScanProgress()` and `readScanProgress()` helpers; used as IPC channel between headless task and UI
+- **`src/lib/faceScanHeadless.ts`** (new) — self-contained scan logic with zero React dependencies; calls `initDb`, `getRecentPhotos`, `detectFacesInAsset`, `saveFaceEmbedding`, `runClustering`; writes progress to `scan_progress` every batch; registers itself via `AppRegistry.registerHeadlessTask(FACE_SCAN_TASK, () => faceScanTask)` at module load time
+- **`index.ts`** — `import '@/lib/faceScanHeadless'` added as the very first import, before `expo-router/entry`; this is the only place that runs in a headless JS context (React component files like `_layout.tsx` never load without a UI)
+- **`src/store/peopleStore.ts`** — `startScan` now attempts `FgNative.runTask({ taskName: FACE_SCAN_TASK })` after starting the foreground service; if it succeeds, switches to SQLite-polling mode (1.5 s interval reading `readScanProgress()`); if `runTask` throws, falls back to in-process foreground scan unchanged
+- **Build approach** — `./gradlew assembleDebug` + `adb -s 4502a501 install -r -d` used throughout (Expo CLI `run:android` kept targeting Pixel_8 emulator-5554 even with device connected; `ANDROID_SERIAL` env var is the correct fix but Gradle direct-install is reliable)
+
 ---
 
 ## Key Architecture Decisions
@@ -234,6 +259,16 @@
 | `persistClusteringResults` single transaction | Cluster upserts and embedding assignments are committed atomically to prevent orphaned face_embeddings rows if the app crashes mid-clustering |
 | `MIN_CLUSTER_SIZE = 3` | Hides noise clusters from single stray face detections; only people who appear in ≥ 3 photos are shown |
 | `FACE_CLUSTER_THRESHOLD = 0.6` (Euclidean) | Empirically chosen for landmark vectors; tighter values over-split the same person, looser values merge different people |
+| `MODIFICATION_TIME` sort in `getPhotosByDate` + `getRecentPhotos` | `CREATION_TIME` (DATE_TAKEN) is null for Android camera photos without EXIF; `DATE_MODIFIED` is always set |
+| `getModificationTime()` fallback in `groupAssetsByDate` | Prevents null EXIF photos grouping under 1970 date header; falls back to modification time when creation time unavailable |
+| `_createAssetAsync` from `expo-media-library/legacy` in `createAsset()` | SDK 56 deprecated the /next class-based `createAssetAsync`; legacy path is stable and returns a numeric ID usable with `new Asset()` |
+| 2-second delayed `galleryStore.invalidate()` after camera capture | Android MediaStore indexes new photos asynchronously; immediate query returns stale results |
+| Background People scan + compact banner | Avoids blocking UI during 5–10 min ML Kit inference on large libraries; user keeps access to all tabs |
+| `sub.remove()` only in `useGallery` cleanup (not `removeAllListeners()`) | `removeAllListeners()` is global scope — kills every registered media-library listener across the app |
+| `AppRegistry.registerHeadlessTask` in `index.ts`, not `_layout.tsx` | In a HeadlessJS context Android spawns a bare JS runtime — React component files never execute, so any registration inside a component or screen is invisible to `runTask` |
+| `scan_progress` SQLite table as headless↔UI IPC | HeadlessJS task runs in a separate JS context with no shared memory; SQLite is the only reliable cross-context state channel |
+| `NativeModules.ForegroundService` direct call instead of library wrapper | `@supersami/rn-foreground-service` `start()` internally calls `runTask`, which fails if the headless task isn't registered yet — direct native module call decouples service start from task dispatch |
+| `foregroundServiceType="specialUse"` on Android 15 | Android 15 removed `dataSync` foreground service type; `specialUse` + `FOREGROUND_SERVICE_SPECIAL_USE` permission is the only valid type for general-purpose background work |
 
 ---
 
@@ -272,6 +307,7 @@ src/
     duplicateDetector.ts        — burst detection via creation time clustering
     faceDetector.ts             — detectFacesInAsset via ML Kit; returns normalized landmark embedding + bbox
     faceClusterer.ts            — runClustering: greedy nearest-neighbor; euclideanDistance, updateCentroid
+    faceScanHeadless.ts         — HeadlessJS task (GathrFaceScanTask); self-contained scan + clustering; writes to scan_progress table
     haptics.ts                  — haptic wrappers
     dateUtils.ts                — groupAssetsByDate, creation time cache
     theme.ts                    — darkColors, lightColors, spacing, radius, typography
@@ -331,3 +367,9 @@ src/
 - Zoom tap buttons (2×/5×) are approximate — `expo-camera zoom` is 0–1 of device max zoom, which varies by device; no API to query actual max zoom ratio from JS
 - People scan time on large libraries: ~5–10 min for 1 000 photos (ML Kit inference + bridge overhead per asset)
 - Face clustering accuracy degrades with large pose/lighting variation — landmark-based embedding has no semantic understanding of identity
+- HeadlessJS scan (`GathrFaceScanTask`) awaiting confirmed end-to-end test on device — task launches and `index.ts` registration is in place; background progress past 0% not yet verified post-rebuild
+- **[BUG — HIGH]** `createAsset()` in `mediaLibrary.ts` line 57: `new Asset(saved.id)` wraps bare numeric ID on Android; `/next` Query expects a `content://` URI — album covers saved via in-app camera show as blank. Fix: `content://media/external/images/media/${saved.id}` on Android
+- **[BUG — MEDIUM]** Face crop bounds not clamped after origin clamp in `faceDetector.ts` lines 98–101: `cropW/cropH` can exceed image dimensions → `ImageInvalidCropException` silently drops faces near edges. Fix: add `Math.min(cropW, imageWidth - cropX)` / `Math.min(cropH, imageHeight - cropY)`
+- **[BUG — MEDIUM]** `startScan` outer catch in `peopleStore.ts` swallows errors silently — user cannot distinguish a crash from zero results. Fix: surface via `scanError` state field or UndoToast
+- **[LOW]** Gallery sorted by `MODIFICATION_TIME` but grouped by `getCreationTime()` — edited photos sort to top but appear under original year header
+- **[LOW]** Dead-code `?? 0` fallback in `dateUtils.ts` line 90 — unreachable but silently returns 1970 on future cache miss; replace with `console.warn`
