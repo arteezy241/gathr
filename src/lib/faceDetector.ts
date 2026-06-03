@@ -1,4 +1,4 @@
-import { Platform } from 'react-native'
+import { Platform, Image } from 'react-native'
 import FaceDetection from '@react-native-ml-kit/face-detection'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import type { TfliteModel, TensorflowModelDelegate } from 'react-native-fast-tflite'
@@ -36,8 +36,8 @@ function getModel(): Promise<TfliteModel | null> {
           // Core ML may reject some model architectures — fall back to CPU
           return await loadTensorflowModel(src, [])
         }
-      } catch {
-        // Native module not yet compiled into this build — scan will find no faces
+      } catch (e) {
+        console.warn('[faceDetector] TFLite model/module failed to load:', e)
         return null
       }
     })()
@@ -76,14 +76,21 @@ export async function detectFacesInAsset(assetUri: string): Promise<DetectedFace
   if (!assetUri) return []
   try {
     const model = await getModel()
-    if (model === null) return []   // native module not available yet
+    if (model === null) {
+      console.warn('[faceDetector] getModel() returned null — skipping detection')
+      return []
+    }
 
     const faces = await FaceDetection.detect(assetUri, {
-      performanceMode: 'fast',
+      performanceMode: 'accurate',
       landmarkMode: 'none',
     })
 
     if (faces.length === 0) return []
+
+    const { width: imageWidth, height: imageHeight } = await new Promise<{ width: number; height: number }>(
+      (resolve, reject) => { Image.getSize(assetUri, (w, h) => { resolve({ width: w, height: h }) }, reject) },
+    )
 
     const results: DetectedFace[] = []
 
@@ -97,8 +104,10 @@ export async function detectFacesInAsset(assetUri: string): Promise<DetectedFace
         const padY = bh * BBOX_PAD
         const cropX = Math.max(0, bx - padX)
         const cropY = Math.max(0, by - padY)
-        const cropW = bw + padX * 2
-        const cropH = bh + padY * 2
+        let cropW = bw + padX * 2
+        let cropH = bh + padY * 2
+        cropW = Math.min(cropW, imageWidth - cropX)
+        cropH = Math.min(cropH, imageHeight - cropY)
 
         const imageRef = await ImageManipulator.manipulate(assetUri)
           .crop({ originX: cropX, originY: cropY, width: cropW, height: cropH })
@@ -127,7 +136,8 @@ export async function detectFacesInAsset(assetUri: string): Promise<DetectedFace
     }
 
     return results
-  } catch {
+  } catch (e) {
+    console.warn('[faceDetector] detectFacesInAsset failed:', e)
     return []
   }
 }
