@@ -4,6 +4,7 @@ import {
   Dimensions,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,62 +12,338 @@ import {
 } from 'react-native'
 import { Stack, useRouter } from 'expo-router'
 import { Image } from 'expo-image'
-import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import Svg, { Circle, Path } from 'react-native-svg'
-import { usePeopleStore, shouldRescan, type PersonCluster } from '@/store/peopleStore'
-import { useSheet } from '@/components/ui/SheetProvider'
+import Svg, { Path } from 'react-native-svg'
+import { usePeopleStore, type PersonCluster } from '@/store/peopleStore'
 import { useTheme } from '@/lib/themeContext'
-import { radius, spacing, typography, type ThemeColors } from '@/lib/theme'
-import { hapticTap } from '@/lib/haptics'
+import { type ThemeColors } from '@/lib/theme'
+import { hapticTap, hapticAction } from '@/lib/haptics'
+import { PILL_HEIGHT, PILL_MARGIN_BOTTOM } from '@/components/ui/FloatingTabBar'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
-const NUM_COLUMNS = 2
-const CARD_GAP = 8
-const CARD_WIDTH = Math.floor((SCREEN_WIDTH - spacing.md * 2 - CARD_GAP) / NUM_COLUMNS)
+const GRID_GAP = 2
+const CARD_SIZE = Math.floor((SCREEN_WIDTH - GRID_GAP) / 2)
+
+const AC = '#A488BE'
 
 function assetUri(assetId: string): string {
   return Platform.OS === 'ios' ? `ph://${assetId}` : assetId
 }
 
-function PeopleEmptySvg({ color }: { color: string }) {
+// ─── Gathr mark (chevron/arch shape) for empty state ─────────────────────────
+function GathrMark({ size = 48, color = AC }: { size?: number; color?: string }) {
   return (
-    <Svg width={120} height={120} viewBox="0 0 120 120" fill="none">
-      {/* Back person silhouette */}
-      <Circle cx={70} cy={38} r={16} stroke={color} strokeWidth={3} />
+    <Svg width={size} height={size * 0.72} viewBox="0 0 20 14.4" fill="none">
       <Path
-        d="M40 110c0-22 13-36 30-36s30 14 30 36"
+        d="M2 2L10 11L18 2"
         stroke={color}
-        strokeWidth={3}
+        strokeWidth="3.2"
         strokeLinecap="round"
-      />
-      {/* Front person silhouette (overlapping) */}
-      <Circle cx={50} cy={42} r={16} stroke={color} strokeWidth={3} />
-      <Path
-        d="M20 110c0-22 13-36 30-36s30 14 30 36"
-        stroke={color}
-        strokeWidth={3}
-        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </Svg>
   )
 }
 
+// ─── Rescan dropdown menu ─────────────────────────────────────────────────────
+interface RescanMenuProps {
+  onClose: () => void
+  onRescan: () => void
+  onWipeRescan: () => void
+}
+
+function RescanMenu({ onClose, onRescan, onWipeRescan }: RescanMenuProps) {
+  const { colors } = useTheme()
+  const rm = useMemo(() => makeRescanStyles(colors), [colors])
+  return (
+    <View style={rm.panel}>
+      <Pressable
+        onPress={() => { onRescan(); onClose() }}
+        style={({ pressed }) => [rm.item, pressed && rm.itemPressed]}
+      >
+        <Text style={rm.itemText}>Rescan library</Text>
+      </Pressable>
+      <View style={rm.divider} />
+      <Pressable
+        onPress={() => { onWipeRescan(); onClose() }}
+        style={({ pressed }) => [rm.item, pressed && rm.itemPressed]}
+      >
+        <Text style={[rm.itemText, rm.itemDanger]}>Wipe &amp; rescan</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+function makeRescanStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    panel: {
+      position: 'absolute',
+      top: 38,
+      right: 0,
+      width: 188,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+      zIndex: 200,
+    },
+    item: {
+      paddingHorizontal: 16,
+      paddingVertical: 13,
+    },
+    itemPressed: {
+      backgroundColor: colors.surfaceElevated,
+    },
+    itemText: {
+      color: colors.text,
+      fontSize: 14,
+      letterSpacing: 0.05,
+    },
+    itemDanger: {
+      color: colors.accentRed,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginHorizontal: 10,
+    },
+  })
+}
+
+// ─── People header ────────────────────────────────────────────────────────────
+interface PeopleHeaderProps {
+  count: number
+  isScanning: boolean
+  onRescan: () => void
+  onWipeRescan: () => void
+}
+
+function PeopleHeader({ count, isScanning, onRescan, onWipeRescan }: PeopleHeaderProps) {
+  const { colors } = useTheme()
+  const hdr = useMemo(() => makePeopleHeaderStyles(colors), [colors])
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  return (
+    <View style={hdr.row}>
+      <Text style={hdr.title}>
+        {count} {count === 1 ? 'person' : 'people'}
+      </Text>
+      <View style={{ position: 'relative' }}>
+        <Pressable
+          onPress={() => { setMenuOpen((v) => !v) }}
+          style={({ pressed }) => [hdr.btn, (pressed || menuOpen) && hdr.btnActive]}
+          disabled={isScanning}
+          hitSlop={8}
+        >
+          {isScanning
+            ? <ActivityIndicator size="small" color={AC} />
+            : (
+              <Svg width={19} height={19} viewBox="0 0 19 19" fill="none">
+                <Path
+                  d="M16.5 9.5A7 7 0 114.2 4.5"
+                  stroke={menuOpen ? colors.textSecondary : colors.textTertiary}
+                  strokeWidth="1.65"
+                  strokeLinecap="round"
+                />
+                <Path
+                  d="M4 2v3.2h3.2"
+                  stroke={menuOpen ? colors.textSecondary : colors.textTertiary}
+                  strokeWidth="1.65"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            )}
+        </Pressable>
+        {menuOpen && (
+          <>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => { setMenuOpen(false) }} />
+            <RescanMenu
+              onClose={() => { setMenuOpen(false) }}
+              onRescan={onRescan}
+              onWipeRescan={onWipeRescan}
+            />
+          </>
+        )}
+      </View>
+    </View>
+  )
+}
+
+function makePeopleHeaderStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 14,
+      paddingTop: 4,
+      paddingBottom: 10,
+      flexShrink: 0,
+    },
+    title: {
+      color: colors.text,
+      fontSize: 22,
+      fontWeight: '700',
+      letterSpacing: -0.5,
+    },
+    btn: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    btnActive: {
+      backgroundColor: colors.surfaceElevated,
+    },
+  })
+}
+
+// ─── Scan banner ──────────────────────────────────────────────────────────────
+interface ScanBannerProps {
+  scanned: number
+  total: number
+  progress: number
+}
+
+function ScanBanner({ scanned, total, progress }: ScanBannerProps) {
+  const { colors } = useTheme()
+  const sb = useMemo(() => makeScanBannerStyles(colors), [colors])
+  const pct = Math.min(100, progress)
+  return (
+    <View style={sb.container}>
+      <View style={sb.row}>
+        <ActivityIndicator size="small" color={AC} style={{ width: 13, height: 13 }} />
+        <Text style={sb.text} numberOfLines={1}>
+          {'Scanning '}
+          <Text style={sb.textBold}>{scanned.toLocaleString()}</Text>
+          {' / '}
+          <Text style={sb.textDim}>{total > 0 ? total.toLocaleString() : '…'}</Text>
+          {' photos'}
+        </Text>
+        <Text style={sb.pct}>{Math.round(pct)}%</Text>
+      </View>
+      <View style={sb.track}>
+        <View style={[sb.fill, { width: `${String(pct)}%` as `${number}%` }]} />
+      </View>
+    </View>
+  )
+}
+
+function makeScanBannerStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      marginHorizontal: 12,
+      marginBottom: 10,
+      borderRadius: 14,
+      overflow: 'hidden',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: 'rgba(164,136,190,0.22)',
+      flexShrink: 0,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingTop: 10,
+      paddingBottom: 8,
+    },
+    text: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '500',
+      flex: 1,
+      letterSpacing: 0.05,
+    },
+    textBold: {
+      color: colors.text,
+      fontWeight: '600',
+    },
+    textDim: {
+      color: colors.textTertiary,
+    },
+    pct: {
+      color: colors.textTertiary,
+      fontSize: 11,
+      fontWeight: '500',
+      letterSpacing: 0.1,
+    },
+    track: {
+      height: 2,
+      backgroundColor: colors.border,
+      overflow: 'hidden',
+    },
+    fill: {
+      height: 2,
+      backgroundColor: colors.accent,
+    },
+  })
+}
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
+function EmptyState({ onScan }: { onScan: () => void }) {
+  const { colors } = useTheme()
+  return (
+    <View style={es.container}>
+      <View style={{ marginBottom: 24, opacity: 0.75 }}>
+        <GathrMark size={48} color={colors.accent} />
+      </View>
+      <Text style={[es.title, { color: colors.text }]}>Discover the people{'\n'}in your photos</Text>
+      <Pressable onPress={onScan} style={({ pressed }) => [es.btn, { backgroundColor: colors.accent }, pressed && { opacity: 0.85 }]}>
+        <Text style={es.btnText}>Scan Library</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+const es = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 80,
+  },
+  title: {
+    fontSize: 19,
+    fontWeight: '600',
+    letterSpacing: -0.4,
+    textAlign: 'center',
+    lineHeight: 26,
+    marginBottom: 30,
+  },
+  btn: {
+    borderRadius: 22,
+    paddingHorizontal: 30,
+    paddingVertical: 11,
+  },
+  btnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.05,
+  },
+})
+
+// ─── Person card ──────────────────────────────────────────────────────────────
 interface PersonCardProps {
   cluster: PersonCluster
   index: number
-  colors: ThemeColors
+  onPress: () => void
   onRename: (clusterId: string, name: string) => void
 }
 
-function PersonCard({ cluster, index, colors, onRename }: PersonCardProps) {
-  const router = useRouter()
+function PersonCard({ cluster, index, onPress, onRename }: PersonCardProps) {
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameText, setRenameText] = useState(cluster.name ?? '')
   const inputRef = useRef<TextInput>(null)
 
   const displayName = cluster.name ?? `Person ${String(index + 1)}`
+  const isNamed = cluster.name !== null && cluster.name.length > 0
 
   function handleLongPress() {
     hapticTap()
@@ -77,351 +354,322 @@ function PersonCard({ cluster, index, colors, onRename }: PersonCardProps) {
 
   function submitRename() {
     const trimmed = renameText.trim()
-    if (trimmed.length > 0) {
-      onRename(cluster.id, trimmed)
-    }
+    if (trimmed.length > 0) onRename(cluster.id, trimmed)
     setIsRenaming(false)
   }
 
-  const cardStyles = useMemo(() => makeCardStyles(colors), [colors])
-
   return (
     <Pressable
-      onPress={() => {
-        hapticTap()
-        router.push({ pathname: '/people/[id]', params: { id: cluster.id } })
-      }}
+      onPress={onPress}
       onLongPress={handleLongPress}
       delayLongPress={400}
-      style={cardStyles.card}
+      style={pc.card}
     >
       <Image
         source={{ uri: assetUri(cluster.coverAssetId) }}
-        style={cardStyles.coverImage}
+        style={StyleSheet.absoluteFill}
         contentFit="cover"
         recyclingKey={cluster.coverAssetId}
         transition={200}
       />
+
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.6)']}
-        style={cardStyles.gradient}
+        colors={['transparent', 'rgba(0,0,0,0.72)']}
+        style={pc.scrim}
+        pointerEvents="none"
       />
-      <View style={cardStyles.overlay}>
+
+      <View style={pc.labelRow}>
         {isRenaming ? (
           <TextInput
             ref={inputRef}
-            style={cardStyles.renameInput}
             value={renameText}
             onChangeText={setRenameText}
             onSubmitEditing={submitRename}
             onBlur={submitRename}
             returnKeyType="done"
             autoCorrect={false}
-            placeholderTextColor="rgba(255,255,255,0.5)"
-            placeholder="Enter name"
+            selectionColor={AC}
+            style={pc.renameInput}
           />
         ) : (
-          <Text style={cardStyles.nameLabel} numberOfLines={1}>{displayName}</Text>
+          <Text
+            style={[pc.name, !isNamed && pc.nameUnnamed]}
+            numberOfLines={1}
+          >
+            {displayName}
+          </Text>
         )}
-        <View style={cardStyles.countBadge}>
-          <Text style={cardStyles.countText}>{String(cluster.photoCount)}</Text>
-        </View>
+        <Text style={pc.count}>{String(cluster.photoCount)}</Text>
       </View>
+
+      {isRenaming && <View style={pc.renameBorder} pointerEvents="none" />}
     </Pressable>
   )
+}
+
+const pc = StyleSheet.create({
+  card: {
+    width: CARD_SIZE,
+    height: CARD_SIZE,
+    borderRadius: 3,
+    overflow: 'hidden',
+    backgroundColor: '#1a1428',
+  },
+  scrim: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: CARD_SIZE * 0.56,
+  },
+  labelRow: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 10,
+    paddingBottom: 9,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 4,
+  },
+  name: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.1,
+    flex: 1,
+    minWidth: 0,
+  },
+  nameUnnamed: {
+    color: 'rgba(235,235,245,0.60)',
+    fontWeight: '400',
+  },
+  count: {
+    color: 'rgba(235,235,245,0.30)',
+    fontSize: 10.5,
+    fontWeight: '500',
+    letterSpacing: 0.15,
+    flexShrink: 0,
+    paddingBottom: 1,
+  },
+  renameInput: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+    padding: 0,
+    paddingBottom: 3,
+    borderBottomWidth: 1.5,
+    borderBottomColor: AC,
+  },
+  renameBorder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 3,
+    borderWidth: 1.5,
+    borderColor: 'rgba(164,136,190,0.25)',
+  },
+})
+
+// ─── People screen ────────────────────────────────────────────────────────────
+interface PersonRow {
+  left: PersonCluster
+  right: PersonCluster | null
+  leftIndex: number
 }
 
 export default function PeopleScreen() {
   const insets = useSafeAreaInsets()
   const { colors } = useTheme()
-  const { clusters, isScanning, scanProgress, lastScannedAt, startScan, recluster, wipeAndRescan, renamePerson, loadClusters } =
-    usePeopleStore()
-  const styles = useMemo(() => makeStyles(colors), [colors])
-  const { showConfirm } = useSheet()
+  const router = useRouter()
+  const {
+    clusters,
+    isScanning,
+    scanProgress,
+    scanScanned,
+    scanTotal,
+    lastScannedAt,
+    startScan,
+    wipeAndRescan,
+    renamePerson,
+    loadClusters,
+  } = usePeopleStore()
+
+  const bottomPad = insets.bottom + PILL_MARGIN_BOTTOM + PILL_HEIGHT + 8
+  const styles = useMemo(() => makeStyles(colors, insets.top, bottomPad), [colors, insets.top, bottomPad])
 
   const hasNeverScanned = lastScannedAt === null && !isScanning
 
-  function handleStartScan() {
-    void startScan()
-  }
-
-  function handleRescan() {
-    showConfirm(
-      'Re-scan Library',
-      'This will re-scan your entire library and may take several minutes.',
-      handleStartScan,
-      { confirmLabel: 'Scan' },
-    )
-  }
-
-  const renderItem = useCallback(({ item, index }: ListRenderItemInfo<PersonCluster>) => (
-    <PersonCard
-      cluster={item}
-      index={index}
-      colors={colors}
-      onRename={(id, name) => { void renamePerson(id, name) }}
-    />
-  ), [colors, renamePerson])
-
-  const keyExtractor = useCallback((item: PersonCluster) => item.id, [])
-
-  // Load clusters on first render if we have a previous scan
   useEffect(() => {
     void loadClusters()
-  }, [])
+  }, [loadClusters])
+
+  const handleRescan = useCallback(() => {
+    hapticAction()
+    void startScan()
+  }, [startScan])
+
+  const handleWipeRescan = useCallback(() => {
+    hapticAction()
+    void wipeAndRescan()
+  }, [wipeAndRescan])
+
+  const handleRename = useCallback((id: string, name: string) => {
+    void renamePerson(id, name)
+  }, [renamePerson])
+
+  // Build rows of 2
+  const rows = useMemo<PersonRow[]>(() => {
+    const result: PersonRow[] = []
+    for (let i = 0; i < clusters.length; i += 2) {
+      result.push({
+        left: clusters[i] as PersonCluster,
+        right: clusters[i + 1] ?? null,
+        leftIndex: i,
+      })
+    }
+    return result
+  }, [clusters])
+
+  const showResults = !hasNeverScanned && clusters.length > 0
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: 'People',
-          headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.text,
-          headerRight: () => (
-            <Pressable
-              onPress={isScanning ? undefined : (shouldRescan(lastScannedAt) ? handleStartScan : handleRescan)}
-              hitSlop={12}
-              style={styles.rescanBtn}
-            >
-              {isScanning
-                ? <ActivityIndicator size="small" color={colors.accent} />
-                : <Text style={[styles.rescanText, { color: colors.accent }]}>
-                    {lastScannedAt === null ? '' : 'Re-scan'}
-                  </Text>
-              }
-            </Pressable>
-          ),
-        }}
-      />
+      <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={[styles.screen, { paddingTop: Platform.OS === 'ios' ? 0 : insets.top }]}>
-        {/* Compact scanning banner — shown while scan runs in background */}
-        {isScanning && (
-          <View style={[styles.scanBanner, { backgroundColor: colors.surfaceElevated }]}>
-            <ActivityIndicator size="small" color={colors.accent} style={{ marginRight: 8 }} />
-            <Text style={[styles.scanBannerText, { color: colors.text }]}>
-              Scanning… {String(Math.round(scanProgress))}%
-            </Text>
-            <View style={[styles.scanBannerBar, { backgroundColor: colors.surface }]}>
-              <View style={[styles.scanBannerFill, { width: `${String(Math.round(scanProgress))}%` as `${number}%`, backgroundColor: colors.accent }]} />
-            </View>
-          </View>
+      <View style={styles.screen}>
+        {/* Header — only shown when there are results or scanning */}
+        {(showResults || isScanning) && (
+          <PeopleHeader
+            count={clusters.length}
+            isScanning={isScanning}
+            onRescan={handleRescan}
+            onWipeRescan={handleWipeRescan}
+          />
         )}
 
+        {/* Scan banner */}
+        {isScanning && (
+          <ScanBanner
+            scanned={scanScanned}
+            total={scanTotal}
+            progress={scanProgress}
+          />
+        )}
+
+        {/* Content */}
         {hasNeverScanned ? (
-          // ── Never scanned state ──────────────────────────────────────────
-          <View style={styles.centered}>
-            <PeopleEmptySvg color={colors.textSecondary} />
-            <Text style={styles.emptyTitle}>Discover People</Text>
-            <Text style={styles.emptyBody}>
-              Gathr groups your photos by the people in them — entirely on your device.
-            </Text>
-            <Pressable style={[styles.scanBtn, { backgroundColor: colors.accent }]} onPress={handleStartScan}>
-              <Text style={styles.scanBtnText}>Scan Library</Text>
-            </Pressable>
-          </View>
-        ) : clusters.length === 0 ? (
-          // ── No results after scan ────────────────────────────────────────
-          <View style={styles.centered}>
-            <PeopleEmptySvg color={colors.textSecondary} />
-            <Text style={styles.emptyTitle}>No People Found</Text>
-            <Text style={styles.emptyBody}>
+          <EmptyState onScan={() => { hapticAction(); void startScan() }} />
+        ) : clusters.length === 0 && !isScanning ? (
+          // No results after scan
+          <View style={styles.noResults}>
+            <View style={{ marginBottom: 24, opacity: 0.75 }}>
+              <GathrMark size={48} color={colors.accent} />
+            </View>
+            <Text style={styles.noResultsTitle}>No people found</Text>
+            <Text style={styles.noResultsBody}>
               No recognizable faces were found. Try scanning again with more photos.
             </Text>
-            <Pressable style={[styles.scanBtn, { backgroundColor: colors.accent }]} onPress={handleStartScan}>
+            <Pressable
+              onPress={() => { hapticAction(); void startScan() }}
+              style={({ pressed }) => [styles.scanBtn, pressed && { opacity: 0.85 }]}
+            >
               <Text style={styles.scanBtnText}>Scan Again</Text>
             </Pressable>
           </View>
         ) : (
-          // ── Results grid ─────────────────────────────────────────────────
-          <FlashList
-            data={clusters}
-            renderItem={renderItem}
-            keyExtractor={keyExtractor}
-            numColumns={NUM_COLUMNS}
-            ListHeaderComponent={
-              <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginBottom: spacing.sm }}>
-                <Pressable style={[styles.rescanPill, { backgroundColor: colors.surfaceElevated, marginBottom: 0 }]} onPress={() => { void recluster() }}>
-                  <Text style={[styles.rescanPillText, { color: colors.accent }]}>Re-cluster</Text>
-                </Pressable>
-                <Pressable style={[styles.rescanPill, { backgroundColor: colors.surfaceElevated, marginBottom: 0 }]} onPress={handleRescan}>
-                  <Text style={[styles.rescanPillText, { color: colors.accent }]}>Re-scan Library</Text>
-                </Pressable>
-                <Pressable style={[styles.rescanPill, { backgroundColor: colors.surfaceElevated, marginBottom: 0 }]} onPress={() => { void wipeAndRescan() }}>
-                  <Text style={[styles.rescanPillText, { color: '#FF3B30' }]}>Wipe & Rescan</Text>
-                </Pressable>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.gridContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {rows.map((row) => (
+              <View key={row.left.id} style={styles.row}>
+                <PersonCard
+                  cluster={row.left}
+                  index={row.leftIndex}
+                  onPress={() => {
+                    hapticTap()
+                    router.push({ pathname: '/people/[id]', params: { id: row.left.id } })
+                  }}
+                  onRename={handleRename}
+                />
+                {row.right !== null ? (
+                  <PersonCard
+                    cluster={row.right}
+                    index={row.leftIndex + 1}
+                    onPress={() => {
+                      hapticTap()
+                      if (row.right !== null) {
+                        router.push({ pathname: '/people/[id]', params: { id: row.right.id } })
+                      }
+                    }}
+                    onRename={handleRename}
+                  />
+                ) : (
+                  <View style={{ width: CARD_SIZE }} />
+                )}
               </View>
-            }
-            contentContainerStyle={{
-              padding: spacing.md,
-              paddingBottom: insets.bottom + 100,
-            }}
-          />
+            ))}
+          </ScrollView>
         )}
       </View>
     </>
   )
 }
 
-function makeStyles(colors: ThemeColors) {
+function makeStyles(colors: ThemeColors, topPad: number, bottomPad: number) {
   return StyleSheet.create({
     screen: {
       flex: 1,
       backgroundColor: colors.background,
+      paddingTop: topPad,
     },
-    centered: {
+    gridContent: {
+      paddingBottom: bottomPad,
+    },
+    row: {
+      flexDirection: 'row',
+      gap: GRID_GAP,
+      marginBottom: GRID_GAP,
+    },
+    noResults: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      padding: spacing.xl,
-      gap: 12,
+      paddingHorizontal: 32,
+      paddingBottom: 80,
     },
-    emptyTitle: {
-      ...typography.headline,
+    noResultsTitle: {
       color: colors.text,
+      fontSize: 19,
+      fontWeight: '600',
+      letterSpacing: -0.3,
       textAlign: 'center',
-      marginTop: 8,
+      marginBottom: 10,
     },
-    emptyBody: {
-      ...typography.body,
+    noResultsBody: {
       color: colors.textTertiary,
+      fontSize: 14,
       textAlign: 'center',
       lineHeight: 22,
+      marginBottom: 28,
     },
     scanBtn: {
-      marginTop: 8,
-      paddingHorizontal: 28,
-      paddingVertical: 14,
-      borderRadius: 12,
+      backgroundColor: colors.accent,
+      borderRadius: 22,
+      paddingHorizontal: 30,
+      paddingVertical: 11,
     },
     scanBtnText: {
       color: '#FFFFFF',
-      ...typography.title,
-    },
-    scanBanner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: spacing.md,
-      paddingVertical: 10,
-      gap: 4,
-    },
-    scanBannerText: {
-      ...typography.caption,
-      flex: 1,
-    },
-    scanBannerBar: {
-      width: 80,
-      height: 4,
-      borderRadius: 2,
-      overflow: 'hidden',
-    },
-    scanBannerFill: {
-      height: '100%',
-      borderRadius: 2,
-    },
-    scanningLabel: {
-      ...typography.headline,
-      color: colors.text,
-      textAlign: 'center',
-    },
-    scanningSubLabel: {
-      ...typography.body,
-      color: colors.textTertiary,
-      textAlign: 'center',
-    },
-    progressBar: {
-      width: '70%',
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: colors.surfaceElevated,
-      overflow: 'hidden',
-    },
-    progressFill: {
-      height: '100%',
-      backgroundColor: colors.accent,
-      borderRadius: 3,
-    },
-    progressLabel: {
-      ...typography.caption,
-      color: colors.textTertiary,
-    },
-    rescanBtn: {
-      paddingRight: 8,
-    },
-    rescanText: {
-      ...typography.body,
-    },
-    rescanPill: {
-      alignSelf: 'flex-end',
-      paddingHorizontal: 14,
-      paddingVertical: 7,
-      borderRadius: 20,
-      marginBottom: spacing.sm,
-    },
-    rescanPillText: {
-      fontSize: 13,
-      fontWeight: '600',
-    },
-  })
-}
-
-function makeCardStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    card: {
-      width: CARD_WIDTH,
-      height: CARD_WIDTH,
-      borderRadius: radius.md,
-      overflow: 'hidden',
-      margin: CARD_GAP / 2,
-      backgroundColor: colors.surface,
-    },
-    coverImage: {
-      width: CARD_WIDTH,
-      height: CARD_WIDTH,
-    },
-    gradient: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: CARD_WIDTH / 2,
-    },
-    overlay: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      flexDirection: 'row',
-      alignItems: 'flex-end',
-      justifyContent: 'space-between',
-      padding: 8,
-    },
-    nameLabel: {
-      color: '#FFFFFF',
-      fontSize: 13,
-      fontWeight: '600',
-      flex: 1,
-      marginRight: 4,
-    },
-    renameInput: {
-      color: '#FFFFFF',
-      fontSize: 13,
-      fontWeight: '600',
-      flex: 1,
-      marginRight: 4,
-      padding: 0,
-      borderBottomWidth: 1,
-      borderBottomColor: 'rgba(255,255,255,0.5)',
-    },
-    countBadge: {
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      borderRadius: 8,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-    },
-    countText: {
-      color: '#FFFFFF',
-      fontSize: 11,
+      fontSize: 15,
       fontWeight: '600',
     },
   })

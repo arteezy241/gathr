@@ -17,6 +17,7 @@ interface SelectionState {
   selectedIds: Set<string>
   isSelecting: boolean
   lastSelectedId: string | null
+  startSelecting: () => void
   toggleSelect: (id: string) => void
   rangeSelect: (ids: string[]) => void
   selectAll: (ids: string[]) => void
@@ -37,6 +38,10 @@ const initialState = {
 
 export const useSelectionStore = create<SelectionState>((set, get) => ({
   ...initialState,
+
+  startSelecting: () => {
+    set({ isSelecting: true })
+  },
 
   toggleSelect: (id) => {
     set((state) => {

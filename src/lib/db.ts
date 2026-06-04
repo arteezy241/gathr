@@ -132,6 +132,20 @@ async function openAndInit(): Promise<SQLiteDatabase> {
       status TEXT NOT NULL DEFAULT 'idle',
       updated_at INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS photo_notes (
+      asset_id TEXT PRIMARY KEY,
+      note_text TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS photo_tags (
+      asset_id TEXT NOT NULL,
+      tag TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (asset_id, tag)
+    );
   `)
   try {
     await db.execAsync('ALTER TABLE trips ADD COLUMN place TEXT;')
@@ -243,6 +257,16 @@ export async function updateAlbumCover(albumId: string, assetId: string): Promis
     'UPDATE albums SET cover_asset_id = ?, updated_at = ? WHERE id = ?',
     [assetId, Date.now(), albumId],
   )
+}
+
+export async function renameAlbum(id: string, name: string): Promise<void> {
+  const db = await getDb()
+  await db.runAsync('UPDATE albums SET name = ?, updated_at = ? WHERE id = ?', [name, Date.now(), id])
+}
+
+export async function setAlbumPrivate(id: string, isPrivate: boolean): Promise<void> {
+  const db = await getDb()
+  await db.runAsync('UPDATE albums SET is_private = ?, updated_at = ? WHERE id = ?', [isPrivate ? 1 : 0, Date.now(), id])
 }
 
 function rowToStoredTrip(row: TripRow): StoredTrip {
@@ -564,4 +588,99 @@ export async function readScanProgress(): Promise<ScanProgress> {
   )
   if (!row) return { current: 0, total: 0, status: 'idle' }
   return { current: row.current, total: row.total, status: row.status as ScanStatus }
+}
+
+// ── Photo Notes ───────────────────────────────────────────────────────────────
+
+export interface PhotoNote {
+  assetId: string
+  noteText: string
+  createdAt: number
+  updatedAt: number
+}
+
+export async function getNote(assetId: string): Promise<PhotoNote | null> {
+  const db = await getDb()
+  const row = await db.getFirstAsync<{ note_text: string; created_at: number; updated_at: number }>(
+    'SELECT note_text, created_at, updated_at FROM photo_notes WHERE asset_id = ?',
+    [assetId],
+  )
+  if (!row) return null
+  return { assetId, noteText: row.note_text, createdAt: row.created_at, updatedAt: row.updated_at }
+}
+
+export async function saveNote(assetId: string, noteText: string): Promise<void> {
+  const db = await getDb()
+  const now = Date.now()
+  await db.runAsync(
+    `INSERT INTO photo_notes (asset_id, note_text, created_at, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(asset_id) DO UPDATE SET note_text = excluded.note_text, updated_at = excluded.updated_at`,
+    [assetId, noteText, now, now],
+  )
+}
+
+export async function deleteNote(assetId: string): Promise<void> {
+  const db = await getDb()
+  await db.runAsync('DELETE FROM photo_notes WHERE asset_id = ?', [assetId])
+}
+
+// ── Photo Tags ────────────────────────────────────────────────────────────────
+
+export async function getTagsForAsset(assetId: string): Promise<string[]> {
+  const db = await getDb()
+  const rows = await db.getAllAsync<{ tag: string }>(
+    'SELECT tag FROM photo_tags WHERE asset_id = ? ORDER BY created_at ASC',
+    [assetId],
+  )
+  return rows.map((r) => r.tag)
+}
+
+export async function addTag(assetId: string, tag: string): Promise<void> {
+  const db = await getDb()
+  await db.runAsync(
+    'INSERT OR IGNORE INTO photo_tags (asset_id, tag, created_at) VALUES (?, ?, ?)',
+    [assetId, tag.trim().toLowerCase(), Date.now()],
+  )
+}
+
+export async function removeTag(assetId: string, tag: string): Promise<void> {
+  const db = await getDb()
+  await db.runAsync('DELETE FROM photo_tags WHERE asset_id = ? AND tag = ?', [assetId, tag])
+}
+
+export async function clearTagsForAsset(assetId: string): Promise<void> {
+  const db = await getDb()
+  await db.runAsync('DELETE FROM photo_tags WHERE asset_id = ?', [assetId])
+}
+
+export async function getAssetsWithNotes(): Promise<string[]> {
+  const db = await getDb()
+  const rows = await db.getAllAsync<{ asset_id: string }>(
+    `SELECT asset_id FROM photo_notes WHERE note_text != '' ORDER BY updated_at DESC`,
+  )
+  return rows.map((r) => r.asset_id)
+}
+
+export interface NoteEntry {
+  assetId: string
+  noteText: string
+  tags: string[]
+}
+
+export async function getAllNoteEntries(): Promise<NoteEntry[]> {
+  const db = await getDb()
+  const rows = await db.getAllAsync<{ asset_id: string; note_text: string }>(
+    `SELECT asset_id, note_text FROM photo_notes WHERE note_text != '' ORDER BY updated_at DESC`,
+  )
+  const entries = await Promise.all(
+    rows.map(async (r) => {
+      const tagRows = await db.getAllAsync<{ tag: string }>(
+        'SELECT tag FROM photo_tags WHERE asset_id = ? ORDER BY created_at ASC',
+        [r.asset_id],
+      )
+      return { assetId: r.asset_id, noteText: r.note_text, tags: tagRows.map((t) => t.tag) }
+    }),
+  )
+  return entries
 }

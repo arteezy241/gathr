@@ -37,6 +37,8 @@ import { useFavoriteStore } from '@/store/favoriteStore'
 import { useTrashStore } from '@/store/trashStore'
 import { useUndoToast } from '@/components/ui/UndoToast'
 import { useSheet } from '@/components/ui/SheetProvider'
+import { PhotoNotesSheet } from '@/features/gallery/components/PhotoNotesSheet'
+import { useTheme } from '@/lib/themeContext'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 const HIDE_DELAY_MS = 3000
@@ -450,6 +452,7 @@ export default function PhotoDetailScreen() {
     contextId?: string
   }>()
   const router = useRouter()
+  const { colors } = useTheme()
   const allAssets = useGalleryStore((s) => s.assets)
   const removeAssets = useGalleryStore((s) => s.removeAssets)
   const { albums, loadAlbums, addAssetsToAlbum } = useAlbumStore()
@@ -468,6 +471,9 @@ export default function PhotoDetailScreen() {
   const [currentDate, setCurrentDate] = useState<string | null>(null)
   const [overlaysVisible, setOverlaysVisible] = useState(true)
   const [isZoomed, setIsZoomed] = useState(false)
+  const [noteSheetOpen, setNoteSheetOpen] = useState(false)
+  const noteSheetOpenRef = useRef(false)
+  const [dimActive, setDimActive] = useState(false)
 
   const overlayOpacity = useRef(new Animated.Value(1)).current
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -479,13 +485,15 @@ export default function PhotoDetailScreen() {
     if (hideTimerRef.current !== null) clearTimeout(hideTimerRef.current)
     Animated.timing(overlayOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start()
     setOverlaysVisible(true)
-    hideTimerRef.current = setTimeout(() => {
-      Animated.timing(overlayOpacity, {
-        toValue: 0,
-        duration: 220,
-        useNativeDriver: true,
-      }).start(() => { setOverlaysVisible(false) })
-    }, HIDE_DELAY_MS)
+    if (!noteSheetOpenRef.current) {
+      hideTimerRef.current = setTimeout(() => {
+        Animated.timing(overlayOpacity, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }).start(() => { setOverlaysVisible(false) })
+      }, HIDE_DELAY_MS)
+    }
   }, [overlayOpacity])
 
   const toggleOverlays = useCallback(() => {
@@ -500,6 +508,13 @@ export default function PhotoDetailScreen() {
       showOverlays()
     }
   }, [overlaysVisible, overlayOpacity, showOverlays])
+
+  // Delay dim overlay activation to prevent the Note-button touch-up from immediately closing the sheet
+  useEffect(() => {
+    if (!noteSheetOpen) { setDimActive(false); return }
+    const t = setTimeout(() => { setDimActive(true) }, 320)
+    return () => { clearTimeout(t) }
+  }, [noteSheetOpen])
 
   // Keep a ref so onViewableItemsChanged (stable ref) can call the latest version
   const showOverlaysRef = useRef(showOverlays)
@@ -725,10 +740,10 @@ export default function PhotoDetailScreen() {
     return (
       <>
         <Stack.Screen options={{ title: 'Photo' }} />
-        <View style={styles.notFound}>
-          <Text style={styles.notFoundText}>Photo not found</Text>
-          <Pressable style={styles.backFallback} onPress={() => { router.back() }}>
-            <Text style={styles.backFallbackText}>Go back</Text>
+        <View style={[styles.notFound, { backgroundColor: colors.background }]}>
+          <Text style={[styles.notFoundText, { color: colors.textTertiary }]}>Photo not found</Text>
+          <Pressable style={[styles.backFallback, { backgroundColor: colors.surfaceElevated }]} onPress={() => { router.back() }}>
+            <Text style={[styles.backFallbackText, { color: colors.accent }]}>Go back</Text>
           </Pressable>
         </View>
       </>
@@ -803,9 +818,49 @@ export default function PhotoDetailScreen() {
               tint={isFavorited ? '#FF3B30' : '#ffffff'}
               onPress={() => { void toggleFavorite(currentAssetId) }}
             />
+            <ActionButton
+              label="Note"
+              icon="document-text-outline"
+              onPress={() => {
+                noteSheetOpenRef.current = true
+                if (hideTimerRef.current !== null) clearTimeout(hideTimerRef.current)
+                setNoteSheetOpen(true)
+              }}
+            />
             <ActionButton label="Delete" icon="trash-outline" onPress={handleDelete} tint="#FF453A" />
           </View>
         </Animated.View>
+        {/* Photo notes sheet */}
+        {noteSheetOpen && (
+          <>
+            {/* Dim overlay — tap to close */}
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                styles.notesDim,
+              ]}
+              pointerEvents="box-none"
+            >
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                disabled={!dimActive}
+                onPress={() => { noteSheetOpenRef.current = false; setNoteSheetOpen(false); showOverlays() }}
+              />
+            </Animated.View>
+            <PhotoNotesSheet
+              assetId={currentAssetId}
+              photoDate={currentDate !== null ? currentDate.split(' · ')[0] : undefined}
+              photoTime={currentDate !== null ? currentDate.split(' · ')[1] : undefined}
+              onDimChange={(dimmed) => {
+                if (!dimmed) {
+                  noteSheetOpenRef.current = false
+                  setNoteSheetOpen(false)
+                  showOverlays()
+                }
+              }}
+            />
+          </>
+        )}
       </View>
     </>
   )
@@ -969,5 +1024,9 @@ const styles = StyleSheet.create({
   backFallbackText: {
     color: '#0A84FF',
     fontSize: 15,
+  },
+  notesDim: {
+    backgroundColor: 'rgba(0,0,0,0.38)',
+    zIndex: 19,
   },
 })

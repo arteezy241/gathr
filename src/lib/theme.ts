@@ -6,12 +6,12 @@ export const darkColors = {
   text: '#FFFFFF',
   textSecondary: 'rgba(235,235,245,0.8)',
   textTertiary: 'rgba(235,235,245,0.6)',
-  accent: '#0A84FF',
+  accent: '#A488BE',
   accentGreen: '#30D158',
   accentRed: '#FF453A',
-  selectedOverlay: 'rgba(10,132,255,0.3)',
-  glass: 'rgba(28,28,30,0.75)',
-  glassBorder: 'rgba(255,255,255,0.1)',
+  selectedOverlay: 'rgba(164,136,190,0.28)',
+  glass: 'rgba(18,14,24,0.80)',
+  glassBorder: 'rgba(255,255,255,0.09)',
 } as const
 
 export const lightColors = {
@@ -22,10 +22,10 @@ export const lightColors = {
   text: '#000000',
   textSecondary: 'rgba(60,60,67,0.6)',
   textTertiary: 'rgba(60,60,67,0.3)',
-  accent: '#007AFF',
+  accent: '#7B5EA7',
   accentGreen: '#34C759',
   accentRed: '#FF3B30',
-  selectedOverlay: 'rgba(0,122,255,0.25)',
+  selectedOverlay: 'rgba(123,94,167,0.20)',
   glass: 'rgba(255,255,255,0.72)',
   glassBorder: 'rgba(255,255,255,0.45)',
 } as const
