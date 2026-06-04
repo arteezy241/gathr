@@ -102,10 +102,10 @@ export function PhotoNotesSheet({
 
   useEffect(() => {
     function onShow(e: KeyboardEvent) {
-      Animated.timing(keyboardH, { toValue: e.endCoordinates.height, duration: 220, useNativeDriver: false }).start()
+      Animated.timing(keyboardH, { toValue: -e.endCoordinates.height, duration: 220, useNativeDriver: true }).start()
     }
     function onHide() {
-      Animated.timing(keyboardH, { toValue: 0, duration: 180, useNativeDriver: false }).start()
+      Animated.timing(keyboardH, { toValue: 0, duration: 180, useNativeDriver: true }).start()
     }
     const show = Keyboard.addListener('keyboardDidShow', onShow)
     const hide = Keyboard.addListener('keyboardDidHide', onHide)
@@ -182,8 +182,9 @@ export function PhotoNotesSheet({
   ].filter(Boolean) as Array<{ label: string; value: string; mono?: boolean }>
 
   return (
+    <Animated.View style={[styles.outerSheet, { transform: [{ translateY: keyboardH }] }]}>
     <Animated.View
-      style={[styles.sheet, { bottom: keyboardH, transform: [{ translateY }] }]}
+      style={[styles.sheet, { transform: [{ translateY }] }]}
     >
       {/* Drag handle area */}
       <View {...panResponder.panHandlers} style={styles.handleArea}>
@@ -295,14 +296,19 @@ export function PhotoNotesSheet({
         </ScrollView>
       )}
     </Animated.View>
+    </Animated.View>
   )
 }
 
 const styles = StyleSheet.create({
-  sheet: {
+  outerSheet: {
     position: 'absolute',
+    bottom: 0,
     left: 0,
     right: 0,
+    height: SHEET_H,
+  },
+  sheet: {
     height: SHEET_H,
     backgroundColor: SHEET_BG,
     borderTopLeftRadius: 22,
