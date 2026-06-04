@@ -80,6 +80,8 @@ type PeopleState = {
   clusters: PersonCluster[]
   isScanning: boolean
   scanProgress: number
+  scanScanned: number
+  scanTotal: number
   lastScannedAt: number | null
   scanError: string | null
 }
@@ -110,6 +112,8 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
   clusters: [],
   isScanning: false,
   scanProgress: 0,
+  scanScanned: 0,
+  scanTotal: 0,
   lastScannedAt: null,
   scanError: null,
 
@@ -160,6 +164,8 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
       const scannedIds = new Set(await getScannedAssetIds())
       let processed = 0
 
+      set({ scanTotal: total, scanScanned: 0 })
+
       for (let i = 0; i < assets.length; i += BATCH_SIZE) {
         const batch = assets.slice(i, i + BATCH_SIZE)
         await Promise.allSettled(batch.map(async (asset) => {
@@ -183,7 +189,7 @@ export const usePeopleStore = create<PeopleState & PeopleActions>((set) => ({
         }))
         processed += batch.length
         const pct = Math.round((processed / total) * 90)
-        set({ scanProgress: pct })
+        set({ scanProgress: pct, scanScanned: processed })
         await fgUpdate(`Scanning photo ${String(processed)} of ${String(total)} (${String(pct)}%)`)
         await new Promise<void>((r) => { setTimeout(r, 0) })
       }
