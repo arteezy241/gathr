@@ -661,3 +661,26 @@ export async function getAssetsWithNotes(): Promise<string[]> {
   )
   return rows.map((r) => r.asset_id)
 }
+
+export interface NoteEntry {
+  assetId: string
+  noteText: string
+  tags: string[]
+}
+
+export async function getAllNoteEntries(): Promise<NoteEntry[]> {
+  const db = await getDb()
+  const rows = await db.getAllAsync<{ asset_id: string; note_text: string }>(
+    `SELECT asset_id, note_text FROM photo_notes WHERE note_text != '' ORDER BY updated_at DESC`,
+  )
+  const entries = await Promise.all(
+    rows.map(async (r) => {
+      const tagRows = await db.getAllAsync<{ tag: string }>(
+        'SELECT tag FROM photo_tags WHERE asset_id = ? ORDER BY created_at ASC',
+        [r.asset_id],
+      )
+      return { assetId: r.asset_id, noteText: r.note_text, tags: tagRows.map((t) => t.tag) }
+    }),
+  )
+  return entries
+}

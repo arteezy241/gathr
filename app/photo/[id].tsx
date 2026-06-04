@@ -470,6 +470,7 @@ export default function PhotoDetailScreen() {
   const [overlaysVisible, setOverlaysVisible] = useState(true)
   const [isZoomed, setIsZoomed] = useState(false)
   const [noteSheetOpen, setNoteSheetOpen] = useState(false)
+  const noteSheetOpenRef = useRef(false)
 
   const overlayOpacity = useRef(new Animated.Value(1)).current
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -481,13 +482,15 @@ export default function PhotoDetailScreen() {
     if (hideTimerRef.current !== null) clearTimeout(hideTimerRef.current)
     Animated.timing(overlayOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start()
     setOverlaysVisible(true)
-    hideTimerRef.current = setTimeout(() => {
-      Animated.timing(overlayOpacity, {
-        toValue: 0,
-        duration: 220,
-        useNativeDriver: true,
-      }).start(() => { setOverlaysVisible(false) })
-    }, HIDE_DELAY_MS)
+    if (!noteSheetOpenRef.current) {
+      hideTimerRef.current = setTimeout(() => {
+        Animated.timing(overlayOpacity, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }).start(() => { setOverlaysVisible(false) })
+      }, HIDE_DELAY_MS)
+    }
   }, [overlayOpacity])
 
   const toggleOverlays = useCallback(() => {
@@ -808,7 +811,11 @@ export default function PhotoDetailScreen() {
             <ActionButton
               label="Note"
               icon="document-text-outline"
-              onPress={() => { setNoteSheetOpen(true) }}
+              onPress={() => {
+                noteSheetOpenRef.current = true
+                if (hideTimerRef.current !== null) clearTimeout(hideTimerRef.current)
+                setNoteSheetOpen(true)
+              }}
             />
             <ActionButton label="Delete" icon="trash-outline" onPress={handleDelete} tint="#FF453A" />
           </View>
@@ -824,13 +831,19 @@ export default function PhotoDetailScreen() {
               ]}
               pointerEvents="box-none"
             >
-              <Pressable style={StyleSheet.absoluteFill} onPress={() => { setNoteSheetOpen(false) }} />
+              <Pressable style={StyleSheet.absoluteFill} onPress={() => { noteSheetOpenRef.current = false; setNoteSheetOpen(false); showOverlays() }} />
             </Animated.View>
             <PhotoNotesSheet
               assetId={currentAssetId}
               photoDate={currentDate !== null ? currentDate.split(' · ')[0] : undefined}
               photoTime={currentDate !== null ? currentDate.split(' · ')[1] : undefined}
-              onDimChange={(dimmed) => { if (!dimmed) setNoteSheetOpen(false) }}
+              onDimChange={(dimmed) => {
+                if (!dimmed) {
+                  noteSheetOpenRef.current = false
+                  setNoteSheetOpen(false)
+                  showOverlays()
+                }
+              }}
             />
           </>
         )}
