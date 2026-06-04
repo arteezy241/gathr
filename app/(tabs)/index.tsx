@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { Stack } from 'expo-router'
+import { Stack, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useGalleryStore } from '@/store/galleryStore'
@@ -38,6 +38,7 @@ interface TitleBarProps {
 
 function GalleryTitleBar({ onOpenSearch, assets }: TitleBarProps) {
   const { colors } = useTheme()
+  const router = useRouter()
   const isSelecting = useSelectionStore((s) => s.isSelecting)
   const selectedIds = useSelectionStore((s) => s.selectedIds)
   const startSelecting = useSelectionStore((s) => s.startSelecting)
@@ -86,6 +87,9 @@ function GalleryTitleBar({ onOpenSearch, assets }: TitleBarProps) {
       <View style={titleBarStyles.titleActions}>
         <Pressable onPress={onOpenSearch} hitSlop={10}>
           <Ionicons name="search" size={18} color={colors.textTertiary} />
+        </Pressable>
+        <Pressable onPress={() => { hapticTap(); router.push('/notes') }} hitSlop={10}>
+          <Ionicons name="document-text-outline" size={18} color={colors.textTertiary} />
         </Pressable>
         <Pressable
           onPress={() => { hapticTap(); startSelecting() }}

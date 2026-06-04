@@ -126,8 +126,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A1E',
   },
   topFade: {
-    ...StyleSheet.absoluteFillObject,
-    // Subtle top-darken + bottom-darken (no text here, just depth)
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'transparent',
   },
   savePill: {

@@ -653,3 +653,11 @@ export async function clearTagsForAsset(assetId: string): Promise<void> {
   const db = await getDb()
   await db.runAsync('DELETE FROM photo_tags WHERE asset_id = ?', [assetId])
 }
+
+export async function getAssetsWithNotes(): Promise<string[]> {
+  const db = await getDb()
+  const rows = await db.getAllAsync<{ asset_id: string }>(
+    `SELECT asset_id FROM photo_notes WHERE note_text != '' ORDER BY updated_at DESC`,
+  )
+  return rows.map((r) => r.asset_id)
+}

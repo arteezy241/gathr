@@ -3,6 +3,7 @@ import {
   Animated,
   Dimensions,
   Keyboard,
+  type KeyboardEvent,
   PanResponder,
   Pressable,
   ScrollView,
@@ -27,11 +28,11 @@ const SHEET_BG = 'rgba(9,7,14,0.94)'
 
 interface PhotoNotesSheetProps {
   assetId: string
-  photoDate?: string      // e.g. "Thu, Jun 3, 2026"
-  photoTime?: string      // e.g. "10:34 AM"
-  locationName?: string   // e.g. "Tagaytay, Cavite"
-  fileInfo?: string       // e.g. "4.2 MB · JPEG"
-  resolution?: string     // e.g. "4032 × 3024"
+  photoDate?: string | undefined
+  photoTime?: string | undefined
+  locationName?: string | undefined
+  fileInfo?: string | undefined
+  resolution?: string | undefined
   onDimChange?: (dimmed: boolean) => void
 }
 
@@ -97,6 +98,19 @@ export function PhotoNotesSheet({
   const [saved, setSaved] = useState(false)
   const [localNote, setLocalNote] = useState('')
   const translateY = useRef(new Animated.Value(SHEET_H - PEEK_H)).current
+  const keyboardH = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    function onShow(e: KeyboardEvent) {
+      Animated.timing(keyboardH, { toValue: e.endCoordinates.height, duration: 220, useNativeDriver: false }).start()
+    }
+    function onHide() {
+      Animated.timing(keyboardH, { toValue: 0, duration: 180, useNativeDriver: false }).start()
+    }
+    const show = Keyboard.addListener('keyboardDidShow', onShow)
+    const hide = Keyboard.addListener('keyboardDidHide', onHide)
+    return () => { show.remove(); hide.remove() }
+  }, [keyboardH])
 
   const { notes, tags, loadNote, saveNote, loadTags, addTag, removeTag } = useNotesStore()
   const assetNote = notes[assetId] ?? ''
@@ -169,7 +183,7 @@ export function PhotoNotesSheet({
 
   return (
     <Animated.View
-      style={[styles.sheet, { transform: [{ translateY }] }]}
+      style={[styles.sheet, { bottom: keyboardH, transform: [{ translateY }] }]}
     >
       {/* Drag handle area */}
       <View {...panResponder.panHandlers} style={styles.handleArea}>
@@ -287,7 +301,6 @@ export function PhotoNotesSheet({
 const styles = StyleSheet.create({
   sheet: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
     height: SHEET_H,
