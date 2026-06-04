@@ -14,12 +14,12 @@ const CARD_WIDTH = Dimensions.get('window').width - 32
 const CARD_HEIGHT = 200
 
 /** One representative trip per place (most recent), with a count if clustered. */
-type TripCluster = {
+export type TripCluster = {
   representativeTrip: StoredTrip
   count: number
 }
 
-function clusterByPlace(trips: StoredTrip[]): TripCluster[] {
+export function clusterByPlace(trips: StoredTrip[]): TripCluster[] {
   const placeMap = new Map<string, StoredTrip[]>()
   const noPlace: StoredTrip[] = []
 
@@ -101,6 +101,7 @@ export function TripsSection() {
                 coverAsset={assetMap.get(trip.coverAssetId)}
                 onPress={() => { router.push(`/trip/${trip.id}`) }}
                 isSavingAlbum={saving === trip.id}
+                inAlbums={!suggestionIds.has(trip.id)}
                 {...(suggestionIds.has(trip.id) && {
                   onSaveAsAlbum: () => { void saveSuggestionAsAlbum({ trip }) },
                 })}
