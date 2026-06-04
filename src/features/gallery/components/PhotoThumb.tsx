@@ -18,7 +18,6 @@ import { useTheme } from '@/lib/themeContext'
 
 const GAP = 2
 export const THUMB_SIZE = Math.floor((Dimensions.get('window').width - GAP * 2) / 3)
-const CIRCLE_SIZE = 24
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
 const PREVIEW_W = SCREEN_W * 0.82
 const PREVIEW_H = SCREEN_H * 0.58
@@ -192,12 +191,16 @@ export const PhotoThumb = memo(function PhotoThumb({ asset, isSelected, onPress 
           )}
 
           {showCircle && (
-            <View style={styles.circleContainer}>
-              <Ionicons
-                name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
-                size={CIRCLE_SIZE}
-                color={isSelected ? colors.accent : 'rgba(255,255,255,0.65)'}
-              />
+            <View
+              style={[
+                styles.selCircle,
+                {
+                  backgroundColor: isSelected ? colors.accent : 'transparent',
+                  borderColor: isSelected ? colors.accent : 'rgba(255,255,255,0.65)',
+                },
+              ]}
+            >
+              {isSelected && <View style={styles.checkmark} />}
             </View>
           )}
         </Animated.View>
@@ -231,10 +234,24 @@ const styles = StyleSheet.create({
     width: THUMB_SIZE,
     height: THUMB_SIZE,
   },
-  circleContainer: {
+  selCircle: {
     position: 'absolute',
-    top: 5,
-    right: 5,
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkmark: {
+    width: 10,
+    height: 6,
+    borderLeftWidth: 2,
+    borderBottomWidth: 2,
+    borderColor: '#FFFFFF',
+    transform: [{ rotate: '-45deg' }, { translateY: -1 }],
   },
   playIconContainer: {
     position: 'absolute',
