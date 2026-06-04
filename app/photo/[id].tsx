@@ -37,6 +37,7 @@ import { useFavoriteStore } from '@/store/favoriteStore'
 import { useTrashStore } from '@/store/trashStore'
 import { useUndoToast } from '@/components/ui/UndoToast'
 import { useSheet } from '@/components/ui/SheetProvider'
+import { PhotoNotesSheet } from '@/features/gallery/components/PhotoNotesSheet'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 const HIDE_DELAY_MS = 3000
@@ -468,6 +469,7 @@ export default function PhotoDetailScreen() {
   const [currentDate, setCurrentDate] = useState<string | null>(null)
   const [overlaysVisible, setOverlaysVisible] = useState(true)
   const [isZoomed, setIsZoomed] = useState(false)
+  const [noteSheetOpen, setNoteSheetOpen] = useState(false)
 
   const overlayOpacity = useRef(new Animated.Value(1)).current
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -803,9 +805,35 @@ export default function PhotoDetailScreen() {
               tint={isFavorited ? '#FF3B30' : '#ffffff'}
               onPress={() => { void toggleFavorite(currentAssetId) }}
             />
+            <ActionButton
+              label="Note"
+              icon="document-text-outline"
+              onPress={() => { setNoteSheetOpen(true) }}
+            />
             <ActionButton label="Delete" icon="trash-outline" onPress={handleDelete} tint="#FF453A" />
           </View>
         </Animated.View>
+        {/* Photo notes sheet */}
+        {noteSheetOpen && (
+          <>
+            {/* Dim overlay — tap to close */}
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                styles.notesDim,
+              ]}
+              pointerEvents="box-none"
+            >
+              <Pressable style={StyleSheet.absoluteFill} onPress={() => { setNoteSheetOpen(false) }} />
+            </Animated.View>
+            <PhotoNotesSheet
+              assetId={currentAssetId}
+              photoDate={currentDate !== null ? currentDate.split(' · ')[0] : undefined}
+              photoTime={currentDate !== null ? currentDate.split(' · ')[1] : undefined}
+              onDimChange={(dimmed) => { if (!dimmed) setNoteSheetOpen(false) }}
+            />
+          </>
+        )}
       </View>
     </>
   )
@@ -969,5 +997,9 @@ const styles = StyleSheet.create({
   backFallbackText: {
     color: '#0A84FF',
     fontSize: 15,
+  },
+  notesDim: {
+    backgroundColor: 'rgba(0,0,0,0.38)',
+    zIndex: 19,
   },
 })
