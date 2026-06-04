@@ -1,7 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { Animated, Dimensions, FlatList, Platform, Pressable, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native'
+
+function NOOP() { /* intentional no-op absorbs tap events on the modal card */ }
+import {
+  Animated,
+  Dimensions,
+  FlatList,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ListRenderItemInfo,
+} from 'react-native'
 import { Stack, useRouter } from 'expo-router'
 import { Image } from 'expo-image'
+import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -9,14 +23,17 @@ import { getAllNoteEntries, type NoteEntry } from '@/lib/db'
 import { useTheme } from '@/lib/themeContext'
 import { PILL_HEIGHT, PILL_MARGIN_BOTTOM } from '@/components/ui/FloatingTabBar'
 
+const { width: SW, height: SH } = Dimensions.get('window')
 const GAP = 10
 const H_PAD = 16
-const CARD_W = Math.floor((Dimensions.get('window').width - H_PAD * 2 - GAP) / 2)
+const CARD_W = Math.floor((SW - H_PAD * 2 - GAP) / 2)
 const PHOTO_H = Math.floor(CARD_W * 0.75)
 const BODY_H = 88
 
-const AC = '#A488BE'
-const CARD_BG = '#0C0C0E'
+const MODAL_W = SW - 40
+const MODAL_PHOTO_H = Math.floor(MODAL_W * 0.72)
+
+const AC = '#A488BE' // used only in the dark modal overlay
 
 interface NoteRow {
   left: NoteEntry
@@ -37,6 +54,7 @@ function buildRows(entries: NoteEntry[]): NoteRow[] {
 }
 
 function NoteCard({ entry, onPress }: { entry: NoteEntry; onPress: () => void }) {
+  const { colors } = useTheme()
   const scale = useRef(new Animated.Value(1)).current
 
   function onPressIn() {
@@ -52,10 +70,8 @@ function NoteCard({ entry, onPress }: { entry: NoteEntry; onPress: () => void })
 
   return (
     <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
-      <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
-
-        {/* Photo thumbnail */}
-        <View style={styles.photoWrap}>
+      <Animated.View style={[styles.card, { transform: [{ scale }], backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.photoWrap, { backgroundColor: colors.surfaceElevated }]}>
           <Image
             source={{ uri: assetUri(entry.assetId) }}
             style={StyleSheet.absoluteFill}
@@ -63,33 +79,139 @@ function NoteCard({ entry, onPress }: { entry: NoteEntry; onPress: () => void })
             recyclingKey={entry.assetId}
             transition={200}
           />
-          {/* Subtle bottom fade into card body */}
           <LinearGradient
-            colors={['transparent', CARD_BG]}
+            colors={['transparent', colors.surface] as readonly [string, string]}
             style={styles.photoFade}
             pointerEvents="none"
           />
         </View>
-
-        {/* Text body */}
         <View style={styles.body}>
-          <Text style={styles.noteText} numberOfLines={3}>{preview}</Text>
+          <Text style={[styles.noteText, { color: colors.textSecondary }]} numberOfLines={3}>{preview}</Text>
           {entry.tags.length > 0 && (
             <View style={styles.tagRow}>
               {entry.tags.slice(0, 2).map((tag) => (
                 <View key={tag} style={styles.tagPill}>
-                  <Text style={styles.tagText} numberOfLines={1}>{tag}</Text>
+                  <Text style={[styles.tagText, { color: colors.accent }]} numberOfLines={1}>{tag}</Text>
                 </View>
               ))}
               {entry.tags.length > 2 && (
-                <Text style={styles.tagMore}>+{entry.tags.length - 2}</Text>
+                <Text style={[styles.tagMore, { color: colors.textTertiary }]}>+{entry.tags.length - 2}</Text>
               )}
             </View>
           )}
         </View>
-
       </Animated.View>
     </Pressable>
+  )
+}
+
+function NoteDetailModal({
+  entry,
+  topInset,
+  onClose,
+  onOpenPhoto,
+}: {
+  entry: NoteEntry
+  topInset: number
+  onClose: () => void
+  onOpenPhoto: () => void
+}) {
+  const progress = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    Animated.spring(progress, {
+      toValue: 1,
+      damping: 26,
+      stiffness: 280,
+      useNativeDriver: true,
+    }).start()
+  }, [progress])
+
+  function dismiss() {
+    Animated.timing(progress, { toValue: 0, duration: 180, useNativeDriver: true }).start(onClose)
+  }
+
+  const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] })
+  const opacity = progress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.85, 1] })
+
+  return (
+    <Animated.View
+      style={[StyleSheet.absoluteFill, styles.modalOuter, { opacity }]}
+    >
+      {/* Scrim — blurs the notes screen behind the card */}
+      <BlurView intensity={18} tint="systemUltraThinMaterialDark" style={StyleSheet.absoluteFill} />
+      <View
+        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.48)' }]}
+        pointerEvents="none"
+      />
+
+      {/* Backdrop — tap anywhere outside card to dismiss */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
+
+      {/* Card — rendered after backdrop so intercepts touches on card area */}
+      <Animated.View
+        style={[styles.modalCardWrap, { transform: [{ scale }] }]}
+        pointerEvents="box-none"
+      >
+        {/* Pressable absorbs card-area taps that miss interactive children */}
+        <Pressable style={styles.modalCard} onPress={NOOP}>
+          {/* Sharp photo */}
+          <View style={[styles.modalPhotoWrap, { height: MODAL_PHOTO_H }]}>
+            <Image
+              source={{ uri: assetUri(entry.assetId) }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              recyclingKey={`modal-photo-${entry.assetId}`}
+            />
+            <LinearGradient
+              colors={['transparent', 'rgba(12,12,14,0.85)', '#0C0C0E']}
+              style={styles.modalGrad}
+              pointerEvents="none"
+            />
+          </View>
+
+          {/* Body */}
+          <View style={styles.modalBody}>
+            {entry.noteText.trim().length > 0 && (
+              <ScrollView
+                style={styles.modalNoteScroll}
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={entry.noteText.length > 120}
+              >
+                <Text style={styles.modalNoteText}>{entry.noteText}</Text>
+              </ScrollView>
+            )}
+            {entry.tags.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.modalTagScroll}
+              >
+                {entry.tags.map((tag) => (
+                  <View key={tag} style={styles.tagPill}>
+                    <Text style={styles.tagText}>{tag}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            <Pressable style={styles.openPhotoBtn} onPress={onOpenPhoto}>
+              <Ionicons name="expand-outline" size={13} color={AC} />
+              <Text style={styles.openPhotoBtnText}>Open Photo</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Animated.View>
+
+      {/* Close button */}
+      <Pressable
+        style={[styles.modalCloseBtn, { top: topInset + 10 }]}
+        onPress={dismiss}
+        hitSlop={16}
+      >
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+        <Ionicons name="close" size={18} color="rgba(255,255,255,0.80)" />
+      </Pressable>
+    </Animated.View>
   )
 }
 
@@ -99,6 +221,7 @@ export default function NotesScreen() {
   const { colors } = useTheme()
   const [entries, setEntries] = useState<NoteEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [selectedEntry, setSelectedEntry] = useState<NoteEntry | null>(null)
 
   const bottomPad = insets.bottom + PILL_MARGIN_BOTTOM + PILL_HEIGHT + 8
 
@@ -114,7 +237,8 @@ export default function NotesScreen() {
   const rows = buildRows(entries)
   const cardTotalH = PHOTO_H + BODY_H
 
-  function openPhoto(assetId: string) {
+  function openInViewer(assetId: string) {
+    setSelectedEntry(null)
     router.push({
       pathname: '/photo/[id]',
       params: { id: assetId, context: 'album', assetIds: entries.map((e) => e.assetId).join(',') },
@@ -122,11 +246,12 @@ export default function NotesScreen() {
   }
 
   function renderRow({ item }: ListRenderItemInfo<NoteRow>) {
+    const right = item.right
     return (
       <View style={styles.row}>
-        <NoteCard entry={item.left} onPress={() => { openPhoto(item.left.assetId) }} />
-        {item.right !== null ? (
-          <NoteCard entry={item.right} onPress={() => { openPhoto(item.right!.assetId) }} />
+        <NoteCard entry={item.left} onPress={() => { setSelectedEntry(item.left) }} />
+        {right !== null ? (
+          <NoteCard entry={right} onPress={() => { setSelectedEntry(right) }} />
         ) : (
           <View style={[styles.card, { opacity: 0 }]} />
         )}
@@ -137,7 +262,7 @@ export default function NotesScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View style={[styles.screen, { paddingTop: insets.top, backgroundColor: colors.background }]}>
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={() => { router.back() }} hitSlop={12}>
@@ -156,7 +281,7 @@ export default function NotesScreen() {
         {!isLoading && entries.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="document-text-outline" size={32} color={AC} />
+              <Ionicons name="document-text-outline" size={32} color={colors.accent} />
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No notes yet</Text>
             <Text style={[styles.emptyBody, { color: colors.textTertiary }]}>
@@ -166,7 +291,7 @@ export default function NotesScreen() {
         ) : (
           <FlatList
             data={rows}
-            keyExtractor={(item) => `row-${item.rowIndex}`}
+            keyExtractor={(item) => `row-${String(item.rowIndex)}`}
             renderItem={renderRow}
             contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
             showsVerticalScrollIndicator={false}
@@ -174,6 +299,16 @@ export default function NotesScreen() {
           />
         )}
       </View>
+
+      {/* Detail modal — rendered outside the scroll container */}
+      {selectedEntry !== null && (
+        <NoteDetailModal
+          entry={selectedEntry}
+          topInset={insets.top}
+          onClose={() => { setSelectedEntry(null) }}
+          onOpenPhoto={() => { openInViewer(selectedEntry.assetId) }}
+        />
+      )}
     </>
   )
 }
@@ -181,7 +316,7 @@ export default function NotesScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000000',
+    // backgroundColor overridden inline with colors.background
   },
   header: {
     flexDirection: 'row',
@@ -213,14 +348,13 @@ const styles = StyleSheet.create({
     width: CARD_W,
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: CARD_BG,
+    // backgroundColor and borderColor overridden inline with theme colors
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.06)',
   },
   photoWrap: {
     width: CARD_W,
     height: PHOTO_H,
-    backgroundColor: '#1A1A1E',
+    // backgroundColor overridden inline with colors.surfaceElevated
     overflow: 'hidden',
   },
   photoFade: {
@@ -238,7 +372,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   noteText: {
-    color: 'rgba(235,235,245,0.85)',
+    color: 'rgba(235,235,245,0.85)', // overridden inline in NoteCard via colors.textSecondary
     fontSize: 12,
     fontWeight: '400',
     lineHeight: 18,
@@ -257,13 +391,13 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   tagText: {
-    color: AC,
+    color: '#A488BE', // overridden inline in NoteCard via colors.accent
     fontSize: 10,
     fontWeight: '500',
     letterSpacing: 0.1,
   },
   tagMore: {
-    color: 'rgba(164,136,190,0.45)',
+    color: 'rgba(164,136,190,0.45)', // overridden inline in NoteCard via colors.textTertiary
     fontSize: 10,
     fontWeight: '500',
     alignSelf: 'center',
@@ -294,5 +428,85 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 48,
     lineHeight: 20,
+  },
+
+  // ── Modal ──────────────────────────────────────────────────────────────────
+  modalOuter: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 50,
+  },
+  modalCardWrap: {
+    width: MODAL_W,
+  },
+  modalCard: {
+    width: MODAL_W,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: '#0C0C0E',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  modalPhotoWrap: {
+    width: MODAL_W,
+    overflow: 'hidden',
+    backgroundColor: '#1A1A1E',
+  },
+  modalGrad: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: Math.floor(MODAL_PHOTO_H * 0.5),
+  },
+  modalBody: {
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 18,
+    gap: 12,
+  },
+  modalNoteScroll: {
+    maxHeight: SH * 0.18,
+  },
+  modalNoteText: {
+    color: 'rgba(235,235,245,0.88)',
+    fontSize: 14,
+    fontWeight: '400',
+    lineHeight: 22,
+    letterSpacing: 0.05,
+  },
+  modalTagScroll: {
+    gap: 6,
+    flexDirection: 'row',
+  },
+  openPhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-end',
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(164,136,190,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(164,136,190,0.25)',
+  },
+  openPhotoBtnText: {
+    color: AC,
+    fontSize: 12,
+    fontWeight: '500',
+    letterSpacing: 0.1,
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    right: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
 })

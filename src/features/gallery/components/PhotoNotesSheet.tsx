@@ -78,7 +78,7 @@ function AddTagChip({ onAdd }: { onAdd: (tag: string) => void }) {
   }
 
   return (
-    <Pressable style={styles.addTagChip} onPress={() => setEditing(true)}>
+    <Pressable style={styles.addTagChip} onPress={() => { setEditing(true) }}>
       <Ionicons name="add" size={12} color={FG3} />
       <Text style={styles.addTagText}>Add tag</Text>
     </Pressable>
@@ -179,7 +179,7 @@ export function PhotoNotesSheet({
   function handleSave() {
     void saveNote(assetId, localNote)
     setSaved(true)
-    setTimeout(() => setSaved(false), 1600)
+    setTimeout(() => { setSaved(false) }, 1600)
   }
 
   const metaRows = [

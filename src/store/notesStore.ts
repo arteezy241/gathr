@@ -37,11 +37,9 @@ export const useNotesStore = create<NotesState>((set) => ({
 
   async deleteNote(assetId) {
     await dbDeleteNote(assetId)
-    set((s) => {
-      const notes = { ...s.notes }
-      delete notes[assetId]
-      return { notes }
-    })
+    set((s) => ({
+      notes: Object.fromEntries(Object.entries(s.notes).filter(([key]) => key !== assetId)),
+    }))
   },
 
   async loadTags(assetId) {

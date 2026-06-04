@@ -38,6 +38,7 @@ import { useTrashStore } from '@/store/trashStore'
 import { useUndoToast } from '@/components/ui/UndoToast'
 import { useSheet } from '@/components/ui/SheetProvider'
 import { PhotoNotesSheet } from '@/features/gallery/components/PhotoNotesSheet'
+import { useTheme } from '@/lib/themeContext'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 const HIDE_DELAY_MS = 3000
@@ -451,6 +452,7 @@ export default function PhotoDetailScreen() {
     contextId?: string
   }>()
   const router = useRouter()
+  const { colors } = useTheme()
   const allAssets = useGalleryStore((s) => s.assets)
   const removeAssets = useGalleryStore((s) => s.removeAssets)
   const { albums, loadAlbums, addAssetsToAlbum } = useAlbumStore()
@@ -471,6 +473,7 @@ export default function PhotoDetailScreen() {
   const [isZoomed, setIsZoomed] = useState(false)
   const [noteSheetOpen, setNoteSheetOpen] = useState(false)
   const noteSheetOpenRef = useRef(false)
+  const [dimActive, setDimActive] = useState(false)
 
   const overlayOpacity = useRef(new Animated.Value(1)).current
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -505,6 +508,13 @@ export default function PhotoDetailScreen() {
       showOverlays()
     }
   }, [overlaysVisible, overlayOpacity, showOverlays])
+
+  // Delay dim overlay activation to prevent the Note-button touch-up from immediately closing the sheet
+  useEffect(() => {
+    if (!noteSheetOpen) { setDimActive(false); return }
+    const t = setTimeout(() => { setDimActive(true) }, 320)
+    return () => { clearTimeout(t) }
+  }, [noteSheetOpen])
 
   // Keep a ref so onViewableItemsChanged (stable ref) can call the latest version
   const showOverlaysRef = useRef(showOverlays)
@@ -730,10 +740,10 @@ export default function PhotoDetailScreen() {
     return (
       <>
         <Stack.Screen options={{ title: 'Photo' }} />
-        <View style={styles.notFound}>
-          <Text style={styles.notFoundText}>Photo not found</Text>
-          <Pressable style={styles.backFallback} onPress={() => { router.back() }}>
-            <Text style={styles.backFallbackText}>Go back</Text>
+        <View style={[styles.notFound, { backgroundColor: colors.background }]}>
+          <Text style={[styles.notFoundText, { color: colors.textTertiary }]}>Photo not found</Text>
+          <Pressable style={[styles.backFallback, { backgroundColor: colors.surfaceElevated }]} onPress={() => { router.back() }}>
+            <Text style={[styles.backFallbackText, { color: colors.accent }]}>Go back</Text>
           </Pressable>
         </View>
       </>
@@ -831,7 +841,11 @@ export default function PhotoDetailScreen() {
               ]}
               pointerEvents="box-none"
             >
-              <Pressable style={StyleSheet.absoluteFill} onPress={() => { noteSheetOpenRef.current = false; setNoteSheetOpen(false); showOverlays() }} />
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                disabled={!dimActive}
+                onPress={() => { noteSheetOpenRef.current = false; setNoteSheetOpen(false); showOverlays() }}
+              />
             </Animated.View>
             <PhotoNotesSheet
               assetId={currentAssetId}

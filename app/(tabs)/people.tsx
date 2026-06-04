@@ -32,12 +32,12 @@ function assetUri(assetId: string): string {
 }
 
 // ─── Gathr mark (chevron/arch shape) for empty state ─────────────────────────
-function GathrMark({ size = 48 }: { size?: number }) {
+function GathrMark({ size = 48, color = AC }: { size?: number; color?: string }) {
   return (
     <Svg width={size} height={size * 0.72} viewBox="0 0 20 14.4" fill="none">
       <Path
         d="M2 2L10 11L18 2"
-        stroke={AC}
+        stroke={color}
         strokeWidth="3.2"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -54,6 +54,8 @@ interface RescanMenuProps {
 }
 
 function RescanMenu({ onClose, onRescan, onWipeRescan }: RescanMenuProps) {
+  const { colors } = useTheme()
+  const rm = useMemo(() => makeRescanStyles(colors), [colors])
   return (
     <View style={rm.panel}>
       <Pressable
@@ -73,40 +75,42 @@ function RescanMenu({ onClose, onRescan, onWipeRescan }: RescanMenuProps) {
   )
 }
 
-const rm = StyleSheet.create({
-  panel: {
-    position: 'absolute',
-    top: 38,
-    right: 0,
-    width: 188,
-    backgroundColor: 'rgba(28,22,40,0.97)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
-    overflow: 'hidden',
-    zIndex: 200,
-  },
-  item: {
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-  },
-  itemPressed: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  itemText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    letterSpacing: 0.05,
-  },
-  itemDanger: {
-    color: '#FF453A',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    marginHorizontal: 10,
-  },
-})
+function makeRescanStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    panel: {
+      position: 'absolute',
+      top: 38,
+      right: 0,
+      width: 188,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+      zIndex: 200,
+    },
+    item: {
+      paddingHorizontal: 16,
+      paddingVertical: 13,
+    },
+    itemPressed: {
+      backgroundColor: colors.surfaceElevated,
+    },
+    itemText: {
+      color: colors.text,
+      fontSize: 14,
+      letterSpacing: 0.05,
+    },
+    itemDanger: {
+      color: colors.accentRed,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginHorizontal: 10,
+    },
+  })
+}
 
 // ─── People header ────────────────────────────────────────────────────────────
 interface PeopleHeaderProps {
@@ -117,6 +121,8 @@ interface PeopleHeaderProps {
 }
 
 function PeopleHeader({ count, isScanning, onRescan, onWipeRescan }: PeopleHeaderProps) {
+  const { colors } = useTheme()
+  const hdr = useMemo(() => makePeopleHeaderStyles(colors), [colors])
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
@@ -137,13 +143,13 @@ function PeopleHeader({ count, isScanning, onRescan, onWipeRescan }: PeopleHeade
               <Svg width={19} height={19} viewBox="0 0 19 19" fill="none">
                 <Path
                   d="M16.5 9.5A7 7 0 114.2 4.5"
-                  stroke={menuOpen ? 'rgba(235,235,245,0.60)' : 'rgba(235,235,245,0.30)'}
+                  stroke={menuOpen ? colors.textSecondary : colors.textTertiary}
                   strokeWidth="1.65"
                   strokeLinecap="round"
                 />
                 <Path
                   d="M4 2v3.2h3.2"
-                  stroke={menuOpen ? 'rgba(235,235,245,0.60)' : 'rgba(235,235,245,0.30)'}
+                  stroke={menuOpen ? colors.textSecondary : colors.textTertiary}
                   strokeWidth="1.65"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -166,33 +172,35 @@ function PeopleHeader({ count, isScanning, onRescan, onWipeRescan }: PeopleHeade
   )
 }
 
-const hdr = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingTop: 4,
-    paddingBottom: 10,
-    flexShrink: 0,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  btn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnActive: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-})
+function makePeopleHeaderStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 14,
+      paddingTop: 4,
+      paddingBottom: 10,
+      flexShrink: 0,
+    },
+    title: {
+      color: colors.text,
+      fontSize: 22,
+      fontWeight: '700',
+      letterSpacing: -0.5,
+    },
+    btn: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    btnActive: {
+      backgroundColor: colors.surfaceElevated,
+    },
+  })
+}
 
 // ─── Scan banner ──────────────────────────────────────────────────────────────
 interface ScanBannerProps {
@@ -202,6 +210,8 @@ interface ScanBannerProps {
 }
 
 function ScanBanner({ scanned, total, progress }: ScanBannerProps) {
+  const { colors } = useTheme()
+  const sb = useMemo(() => makeScanBannerStyles(colors), [colors])
   const pct = Math.min(100, progress)
   return (
     <View style={sb.container}>
@@ -223,65 +233,68 @@ function ScanBanner({ scanned, total, progress }: ScanBannerProps) {
   )
 }
 
-const sb = StyleSheet.create({
-  container: {
-    marginHorizontal: 12,
-    marginBottom: 10,
-    borderRadius: 14,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(26,20,36,0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(164,136,190,0.16)',
-    flexShrink: 0,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 8,
-  },
-  text: {
-    color: 'rgba(235,235,245,0.60)',
-    fontSize: 12,
-    fontWeight: '500',
-    flex: 1,
-    letterSpacing: 0.05,
-  },
-  textBold: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  textDim: {
-    color: 'rgba(235,235,245,0.30)',
-  },
-  pct: {
-    color: 'rgba(235,235,245,0.30)',
-    fontSize: 11,
-    fontWeight: '500',
-    letterSpacing: 0.1,
-  },
-  track: {
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    overflow: 'hidden',
-  },
-  fill: {
-    height: 2,
-    backgroundColor: AC,
-  },
-})
+function makeScanBannerStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      marginHorizontal: 12,
+      marginBottom: 10,
+      borderRadius: 14,
+      overflow: 'hidden',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: 'rgba(164,136,190,0.22)',
+      flexShrink: 0,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingTop: 10,
+      paddingBottom: 8,
+    },
+    text: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '500',
+      flex: 1,
+      letterSpacing: 0.05,
+    },
+    textBold: {
+      color: colors.text,
+      fontWeight: '600',
+    },
+    textDim: {
+      color: colors.textTertiary,
+    },
+    pct: {
+      color: colors.textTertiary,
+      fontSize: 11,
+      fontWeight: '500',
+      letterSpacing: 0.1,
+    },
+    track: {
+      height: 2,
+      backgroundColor: colors.border,
+      overflow: 'hidden',
+    },
+    fill: {
+      height: 2,
+      backgroundColor: colors.accent,
+    },
+  })
+}
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
 function EmptyState({ onScan }: { onScan: () => void }) {
+  const { colors } = useTheme()
   return (
     <View style={es.container}>
       <View style={{ marginBottom: 24, opacity: 0.75 }}>
-        <GathrMark size={48} />
+        <GathrMark size={48} color={colors.accent} />
       </View>
-      <Text style={es.title}>Discover the people{'\n'}in your photos</Text>
-      <Pressable onPress={onScan} style={({ pressed }) => [es.btn, pressed && { opacity: 0.85 }]}>
+      <Text style={[es.title, { color: colors.text }]}>Discover the people{'\n'}in your photos</Text>
+      <Pressable onPress={onScan} style={({ pressed }) => [es.btn, { backgroundColor: colors.accent }, pressed && { opacity: 0.85 }]}>
         <Text style={es.btnText}>Scan Library</Text>
       </Pressable>
     </View>
@@ -296,7 +309,6 @@ const es = StyleSheet.create({
     paddingBottom: 80,
   },
   title: {
-    color: '#FFFFFF',
     fontSize: 19,
     fontWeight: '600',
     letterSpacing: -0.4,
@@ -305,7 +317,6 @@ const es = StyleSheet.create({
     marginBottom: 30,
   },
   btn: {
-    backgroundColor: AC,
     borderRadius: 22,
     paddingHorizontal: 30,
     paddingVertical: 11,
@@ -559,7 +570,7 @@ export default function PeopleScreen() {
           // No results after scan
           <View style={styles.noResults}>
             <View style={{ marginBottom: 24, opacity: 0.75 }}>
-              <GathrMark size={48} />
+              <GathrMark size={48} color={colors.accent} />
             </View>
             <Text style={styles.noResultsTitle}>No people found</Text>
             <Text style={styles.noResultsBody}>
@@ -651,7 +662,7 @@ function makeStyles(colors: ThemeColors, topPad: number, bottomPad: number) {
       marginBottom: 28,
     },
     scanBtn: {
-      backgroundColor: AC,
+      backgroundColor: colors.accent,
       borderRadius: 22,
       paddingHorizontal: 30,
       paddingVertical: 11,

@@ -49,6 +49,8 @@ interface ContextMenuProps {
 }
 
 function AlbumContextMenu({ album, assetCount, onClose, onRename, onTogglePrivate, onDelete }: ContextMenuProps) {
+  const { colors } = useTheme()
+  const ctx = useMemo(() => makeCtxStyles(colors), [colors])
   const coverSrc = album.coverAssetId
     ? { uri: Platform.OS === 'ios' ? `ph://${album.coverAssetId}` : album.coverAssetId }
     : null
@@ -93,7 +95,7 @@ function AlbumContextMenu({ album, assetCount, onClose, onRename, onTogglePrivat
               onPress={item.action}
               style={({ pressed }) => [ctx.item, pressed && ctx.itemPressed]}
             >
-              <Ionicons name={item.icon} size={16} color={item.danger ? '#FF6060' : 'rgba(235,235,245,0.65)'} />
+              <Ionicons name={item.icon} size={16} color={item.danger ? colors.accentRed : colors.textSecondary} />
               <Text style={[ctx.itemLabel, item.danger && ctx.itemDanger]}>{item.label}</Text>
             </Pressable>
           ),
@@ -103,74 +105,76 @@ function AlbumContextMenu({ album, assetCount, onClose, onRename, onTogglePrivat
   )
 }
 
-const ctx = StyleSheet.create({
-  backdrop: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    zIndex: 150,
-    backgroundColor: 'rgba(0,0,0,0.52)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  panel: {
-    width: 224,
-    backgroundColor: 'rgba(26,20,40,0.98)',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
-    overflow: 'hidden',
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    paddingBottom: 14,
-  },
-  thumb: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: '#2a1e3e',
-  },
-  badgeName: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-    letterSpacing: -0.2,
-  },
-  badgeCount: {
-    color: 'rgba(235,235,245,0.45)',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-  },
-  itemDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    marginHorizontal: 12,
-  },
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  itemPressed: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  itemLabel: {
-    color: '#fff',
-    fontSize: 14.5,
-  },
-  itemDanger: {
-    color: '#FF6060',
-  },
-})
+function makeCtxStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: {
+      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+      zIndex: 150,
+      backgroundColor: 'rgba(0,0,0,0.52)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    panel: {
+      width: 224,
+      backgroundColor: colors.surface,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    badge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: 16,
+      paddingBottom: 14,
+    },
+    thumb: {
+      width: 44,
+      height: 44,
+      borderRadius: 10,
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceElevated,
+    },
+    badgeName: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '600',
+      letterSpacing: -0.2,
+    },
+    badgeCount: {
+      color: colors.textTertiary,
+      fontSize: 12,
+      marginTop: 2,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border,
+    },
+    itemDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginHorizontal: 12,
+    },
+    item: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    itemPressed: {
+      backgroundColor: colors.surfaceElevated,
+    },
+    itemLabel: {
+      color: colors.text,
+      fontSize: 14.5,
+    },
+    itemDanger: {
+      color: colors.accentRed,
+    },
+  })
+}
 
 // ─── Rename sheet ──────────────────────────────────────────────────────────────
 interface RenameSheetProps {
@@ -180,6 +184,8 @@ interface RenameSheetProps {
 }
 
 function RenameSheet({ album, onClose, onSave }: RenameSheetProps) {
+  const { colors } = useTheme()
+  const sh = useMemo(() => makeSheetStyles(colors), [colors])
   const [name, setName] = useState(album.name)
   const [focused, setFocused] = useState(false)
   const inputRef = useRef<TextInput>(null)
@@ -211,7 +217,7 @@ function RenameSheet({ album, onClose, onSave }: RenameSheetProps) {
           onBlur={() => { setFocused(false); }}
           onSubmitEditing={handleSave}
           style={[sh.input, focused && sh.inputFocused]}
-          selectionColor="#A488BE"
+          selectionColor={colors.accent}
           autoCorrect={false}
         />
         <View style={sh.divider} />
@@ -235,95 +241,97 @@ function RenameSheet({ album, onClose, onSave }: RenameSheetProps) {
   )
 }
 
-const sh = StyleSheet.create({
-  backdrop: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    zIndex: 100,
-    backgroundColor: 'rgba(0,0,0,0.54)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: 'rgba(24,18,36,0.99)',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    borderTopWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    padding: 20,
-    paddingTop: 8,
-    paddingBottom: 44,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  label: {
-    color: 'rgba(235,235,245,0.45)',
-    fontSize: 12,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    marginBottom: 10,
-  },
-  input: {
-    width: '100%',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.09)',
-    borderRadius: 13,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    color: '#fff',
-    fontSize: 16,
-    letterSpacing: -0.2,
-  },
-  inputFocused: {
-    borderColor: 'rgba(164,136,190,0.55)',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    marginVertical: 18,
-  },
-  btnRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  btnCancel: {
-    flex: 1,
-    paddingVertical: 13,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    borderRadius: 22,
-    alignItems: 'center',
-  },
-  btnCancelText: {
-    color: 'rgba(235,235,245,0.60)',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  btnSave: {
-    flex: 1,
-    paddingVertical: 13,
-    backgroundColor: '#A488BE',
-    borderRadius: 22,
-    alignItems: 'center',
-  },
-  btnSaveDisabled: {
-    backgroundColor: 'rgba(164,136,190,0.28)',
-  },
-  btnSaveText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  btnSaveTextDisabled: {
-    color: 'rgba(164,136,190,0.55)',
-  },
-})
+function makeSheetStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: {
+      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+      zIndex: 100,
+      backgroundColor: 'rgba(0,0,0,0.54)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 22,
+      borderTopRightRadius: 22,
+      borderTopWidth: 1,
+      borderColor: colors.border,
+      padding: 20,
+      paddingTop: 8,
+      paddingBottom: 44,
+    },
+    handle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+      alignSelf: 'center',
+      marginBottom: 20,
+    },
+    label: {
+      color: colors.textTertiary,
+      fontSize: 12,
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+      marginBottom: 10,
+    },
+    input: {
+      width: '100%',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 13,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+      color: colors.text,
+      fontSize: 16,
+      letterSpacing: -0.2,
+    },
+    inputFocused: {
+      borderColor: colors.accent,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: 18,
+    },
+    btnRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    btnCancel: {
+      flex: 1,
+      paddingVertical: 13,
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 22,
+      alignItems: 'center',
+    },
+    btnCancelText: {
+      color: colors.textSecondary,
+      fontSize: 15,
+      fontWeight: '500',
+    },
+    btnSave: {
+      flex: 1,
+      paddingVertical: 13,
+      backgroundColor: colors.accent,
+      borderRadius: 22,
+      alignItems: 'center',
+    },
+    btnSaveDisabled: {
+      backgroundColor: 'rgba(164,136,190,0.28)',
+    },
+    btnSaveText: {
+      color: '#fff',
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    btnSaveTextDisabled: {
+      color: 'rgba(164,136,190,0.55)',
+    },
+  })
+}
 
 // ─── Delete confirm ───────────────────────────────────────────────────────────
 interface DeleteConfirmProps {
@@ -333,6 +341,8 @@ interface DeleteConfirmProps {
 }
 
 function DeleteConfirm({ album, onClose, onConfirm }: DeleteConfirmProps) {
+  const { colors } = useTheme()
+  const dc = useMemo(() => makeDeleteStyles(colors), [colors])
   return (
     <View style={dc.backdrop}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
@@ -354,66 +364,68 @@ function DeleteConfirm({ album, onClose, onConfirm }: DeleteConfirmProps) {
   )
 }
 
-const dc = StyleSheet.create({
-  backdrop: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    zIndex: 160,
-    backgroundColor: 'rgba(0,0,0,0.62)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  panel: {
-    width: 260,
-    backgroundColor: 'rgba(26,20,40,0.99)',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
-    overflow: 'hidden',
-  },
-  title: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: -0.2,
-    textAlign: 'center',
-    paddingTop: 22,
-    paddingHorizontal: 20,
-    marginBottom: 8,
-  },
-  body: {
-    color: 'rgba(235,235,245,0.45)',
-    fontSize: 13.5,
-    lineHeight: 20,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-  },
-  btnRow: {
-    flexDirection: 'row',
-  },
-  btn: {
-    flex: 1,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  btnLeft: {},
-  btnDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-  },
-  btnText: {
-    color: 'rgba(235,235,245,0.70)',
-    fontSize: 15,
-  },
-  btnDelete: {
-    color: '#FF6060',
-    fontWeight: '600',
-  },
-})
+function makeDeleteStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: {
+      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+      zIndex: 160,
+      backgroundColor: 'rgba(0,0,0,0.62)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    panel: {
+      width: 260,
+      backgroundColor: colors.surface,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    title: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+      letterSpacing: -0.2,
+      textAlign: 'center',
+      paddingTop: 22,
+      paddingHorizontal: 20,
+      marginBottom: 8,
+    },
+    body: {
+      color: colors.textTertiary,
+      fontSize: 13.5,
+      lineHeight: 20,
+      textAlign: 'center',
+      paddingHorizontal: 20,
+      paddingBottom: 16,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border,
+    },
+    btnRow: {
+      flexDirection: 'row',
+    },
+    btn: {
+      flex: 1,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    btnLeft: {},
+    btnDivider: {
+      width: 1,
+      backgroundColor: colors.border,
+    },
+    btnText: {
+      color: colors.textSecondary,
+      fontSize: 15,
+    },
+    btnDelete: {
+      color: colors.accentRed,
+      fontWeight: '600',
+    },
+  })
+}
 
 // ─── Sort dropdown ────────────────────────────────────────────────────────────
 type SortKey = 'name' | 'newest' | 'oldest' | 'count'
@@ -625,9 +637,9 @@ export default function AlbumsScreen() {
               onPress={() => { setSortOpen((v) => !v); }}
               style={[styles.sortPill, sortOpen && styles.sortPillActive]}
             >
-              <Ionicons name="funnel-outline" size={12} color={sortOpen ? '#A488BE' : 'rgba(235,235,245,0.45)'} />
+              <Ionicons name="funnel-outline" size={12} color={sortOpen ? colors.accent : colors.textTertiary} />
               <Text style={[styles.sortPillText, sortOpen && styles.sortPillTextActive]}>{sortLabel}</Text>
-              <Ionicons name="chevron-down" size={11} color={sortOpen ? '#A488BE' : 'rgba(235,235,245,0.30)'} />
+              <Ionicons name="chevron-down" size={11} color={sortOpen ? colors.accent : colors.textTertiary} />
             </Pressable>
 
             {sortOpen && (
@@ -645,7 +657,7 @@ export default function AlbumsScreen() {
                           {opt.label}
                         </Text>
                         {opt.key === sortKey && (
-                          <Ionicons name="checkmark" size={14} color="#A488BE" />
+                          <Ionicons name="checkmark" size={14} color={colors.accent} />
                         )}
                       </Pressable>
                     </View>
@@ -757,7 +769,7 @@ function makeStyles(colors: ThemeColors, topPad: number, bottomPad: number) {
       justifyContent: 'center',
     },
     iconBtnPressed: {
-      backgroundColor: 'rgba(255,255,255,0.09)',
+      backgroundColor: colors.surfaceElevated,
     },
     sortRow: {
       paddingHorizontal: 14,
@@ -772,9 +784,9 @@ function makeStyles(colors: ThemeColors, topPad: number, bottomPad: number) {
       paddingVertical: 5,
       paddingHorizontal: 10,
       paddingLeft: 10,
-      backgroundColor: 'rgba(255,255,255,0.07)',
+      backgroundColor: colors.surfaceElevated,
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.09)',
+      borderColor: colors.border,
       borderRadius: 20,
     },
     sortPillActive: {
@@ -782,28 +794,28 @@ function makeStyles(colors: ThemeColors, topPad: number, bottomPad: number) {
       borderColor: 'rgba(164,136,190,0.30)',
     },
     sortPillText: {
-      color: 'rgba(235,235,245,0.45)',
+      color: colors.textTertiary,
       fontSize: 12.5,
       fontWeight: '500',
     },
     sortPillTextActive: {
-      color: '#A488BE',
+      color: colors.accent,
     },
     sortDropdown: {
       position: 'absolute',
       top: 36,
       left: 14,
       width: 182,
-      backgroundColor: 'rgba(28,22,40,0.97)',
+      backgroundColor: colors.surface,
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.09)',
+      borderColor: colors.border,
       overflow: 'hidden',
       zIndex: 200,
     },
     sortDivider: {
       height: 1,
-      backgroundColor: 'rgba(255,255,255,0.06)',
+      backgroundColor: colors.border,
       marginHorizontal: 10,
     },
     sortItem: {
@@ -814,14 +826,14 @@ function makeStyles(colors: ThemeColors, topPad: number, bottomPad: number) {
       paddingVertical: 11,
     },
     sortItemPressed: {
-      backgroundColor: 'rgba(255,255,255,0.06)',
+      backgroundColor: colors.surfaceElevated,
     },
     sortItemText: {
       color: colors.text,
       fontSize: 13.5,
     },
     sortItemTextActive: {
-      color: '#A488BE',
+      color: colors.accent,
       fontWeight: '500',
     },
     skeletonGrid: {

@@ -5,11 +5,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { BlurView } from 'expo-blur'
 import { type StoredTrip } from '@/lib/db'
 import { type MediaLibraryAsset } from '@/lib/mediaLibrary'
-
-const AC = '#A488BE'
-const FG = '#FFFFFF'
-const FG2 = 'rgba(235,235,245,0.55)'
-const CARD_BODY_BG = '#0C0C0E'
+import { useTheme } from '@/lib/themeContext'
+import { type ThemeColors } from '@/lib/theme'
 
 interface Props {
   trip: StoredTrip
@@ -34,6 +31,8 @@ export function TripCard({
   inAlbums = false,
   large = false,
 }: Props) {
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   const scale = useRef(new Animated.Value(1)).current
 
   function onPressIn() {
@@ -77,10 +76,10 @@ export function TripCard({
             >
               <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
               {isSavingAlbum ? (
-                <ActivityIndicator size="small" color={AC} style={{ marginHorizontal: 2 }} />
+                <ActivityIndicator size="small" color={colors.accent} style={{ marginHorizontal: 2 }} />
               ) : (
                 <>
-                  <Ionicons name="bookmark-outline" size={12} color={AC} />
+                  <Ionicons name="bookmark-outline" size={12} color={colors.accent} />
                   <Text style={styles.savePillText}>Save as Album</Text>
                 </>
               )}
@@ -91,8 +90,8 @@ export function TripCard({
           {inAlbums && (
             <View style={styles.inAlbumsBadge}>
               <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />
-              <View style={styles.inAlbumsCheck}>
-                <Ionicons name="checkmark" size={9} color={FG} />
+              <View style={[styles.inAlbumsCheck, { backgroundColor: colors.accent }]}>
+                <Ionicons name="checkmark" size={9} color="#FFFFFF" />
               </View>
               <Text style={styles.inAlbumsText}>In Albums</Text>
             </View>
@@ -116,97 +115,98 @@ export function TripCard({
   )
 }
 
-const styles = StyleSheet.create({
-  cover: {
-    width: '100%',
-    overflow: 'hidden',
-    backgroundColor: '#1A1A1E',
-  },
-  placeholder: {
-    backgroundColor: '#1A1A1E',
-  },
-  topFade: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'transparent',
-  },
-  savePill: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    overflow: 'hidden',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    paddingTop: 5,
-    paddingBottom: 5,
-    paddingLeft: 8,
-    paddingRight: 10,
-  },
-  savePillText: {
-    color: AC,
-    fontSize: 11,
-    fontWeight: '500',
-    letterSpacing: 0.1,
-  },
-  inAlbumsBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    overflow: 'hidden',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    paddingVertical: 5,
-    paddingHorizontal: 9,
-  },
-  inAlbumsCheck: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: AC,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inAlbumsText: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 11,
-    fontWeight: '400',
-  },
-  body: {
-    backgroundColor: CARD_BODY_BG,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.04)',
-    paddingHorizontal: 16,
-  },
-  name: {
-    color: FG,
-    marginBottom: 4,
-  },
-  nameLarge: {
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: -0.3,
-    marginTop: 14,
-  },
-  nameSmall: {
-    fontSize: 15,
-    fontWeight: '500',
-    letterSpacing: -0.2,
-    marginTop: 11,
-  },
-  meta: {
-    color: FG2,
-    fontSize: 13,
-    fontWeight: '400',
-    marginBottom: 14,
-  },
-})
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    cover: {
+      width: '100%',
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceElevated,
+    },
+    placeholder: {
+      backgroundColor: colors.surfaceElevated,
+    },
+    topFade: {
+      position: 'absolute',
+      top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'transparent',
+    },
+    savePill: {
+      position: 'absolute',
+      top: 12,
+      right: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      overflow: 'hidden',
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.10)',
+      paddingTop: 5,
+      paddingBottom: 5,
+      paddingLeft: 8,
+      paddingRight: 10,
+    },
+    savePillText: {
+      color: colors.accent,
+      fontSize: 11,
+      fontWeight: '500',
+      letterSpacing: 0.1,
+    },
+    inAlbumsBadge: {
+      position: 'absolute',
+      top: 12,
+      right: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      overflow: 'hidden',
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.10)',
+      paddingVertical: 5,
+      paddingHorizontal: 9,
+    },
+    inAlbumsCheck: {
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    inAlbumsText: {
+      color: 'rgba(255,255,255,0.70)',
+      fontSize: 11,
+      fontWeight: '400',
+    },
+    body: {
+      backgroundColor: colors.surface,
+      borderBottomLeftRadius: 12,
+      borderBottomRightRadius: 12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+      paddingHorizontal: 16,
+    },
+    name: {
+      color: colors.text,
+      marginBottom: 4,
+    },
+    nameLarge: {
+      fontSize: 17,
+      fontWeight: '600',
+      letterSpacing: -0.3,
+      marginTop: 14,
+    },
+    nameSmall: {
+      fontSize: 15,
+      fontWeight: '500',
+      letterSpacing: -0.2,
+      marginTop: 11,
+    },
+    meta: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '400',
+      marginBottom: 14,
+    },
+  })
+}

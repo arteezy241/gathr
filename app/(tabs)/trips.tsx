@@ -22,12 +22,13 @@ import { PermissionsEmptyState } from '@/components/ui/PermissionsEmptyState'
 import { clusterByPlace } from '@/features/gallery/components/TripsSection'
 import { usePermissions } from '@/hooks/usePermissions'
 import { PILL_HEIGHT, PILL_MARGIN_BOTTOM } from '@/components/ui/FloatingTabBar'
-
-const FG3 = 'rgba(235,235,245,0.28)'
+import { useTheme } from '@/lib/themeContext'
+import { type ThemeColors } from '@/lib/theme'
 
 export default function TripsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const { colors } = useTheme()
   const { granted, requesting } = usePermissions()
   const { trips, isLoading, loadTrips } = useTripStore()
   const assets = useGalleryStore((s) => s.assets)
@@ -39,6 +40,7 @@ export default function TripsScreen() {
   const mountedRef = useRef(true)
 
   const bottomPad = insets.bottom + PILL_MARGIN_BOTTOM + PILL_HEIGHT + 8
+  const styles = useMemo(() => makeStyles(colors), [colors])
 
   useEffect(() => {
     mountedRef.current = true
@@ -100,7 +102,7 @@ export default function TripsScreen() {
                 <Ionicons
                   name={searchVisible ? 'close' : 'search'}
                   size={20}
-                  color="rgba(235,235,245,0.55)"
+                  color={colors.textSecondary}
                 />
               </Pressable>
             </View>
@@ -111,7 +113,7 @@ export default function TripsScreen() {
                 <TextInput
                   style={styles.searchBar}
                   placeholder="Search trips…"
-                  placeholderTextColor={FG3}
+                  placeholderTextColor={colors.textTertiary}
                   value={query}
                   onChangeText={setQuery}
                   autoFocus
@@ -123,7 +125,7 @@ export default function TripsScreen() {
 
             {isLoading ? (
               <View style={styles.centered}>
-                <ActivityIndicator size="large" color="#A488BE" />
+                <ActivityIndicator size="large" color={colors.accent} />
               </View>
             ) : trips.length === 0 ? (
               <TripsEmptyState />
@@ -168,59 +170,61 @@ export default function TripsScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 12,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    letterSpacing: -0.6,
-    color: '#FFFFFF',
-  },
-  searchWrap: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  searchBar: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 15,
-    color: '#FFFFFF',
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollContent: {
-    paddingTop: 4,
-  },
-  memoriesWrap: {
-    marginBottom: 24,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-    color: FG3,
-    paddingHorizontal: 20,
-    paddingBottom: 14,
-  },
-  cardList: {
-    paddingHorizontal: 16,
-    gap: 14,
-  },
-})
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      paddingBottom: 12,
+    },
+    title: {
+      fontSize: 26,
+      fontWeight: '700',
+      letterSpacing: -0.6,
+      color: colors.text,
+    },
+    searchWrap: {
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+    },
+    searchBar: {
+      backgroundColor: colors.surfaceElevated,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      fontSize: 15,
+      color: colors.text,
+    },
+    centered: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    scrollContent: {
+      paddingTop: 4,
+    },
+    memoriesWrap: {
+      marginBottom: 24,
+    },
+    sectionLabel: {
+      fontSize: 12,
+      fontWeight: '500',
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+      color: colors.textTertiary,
+      paddingHorizontal: 20,
+      paddingBottom: 14,
+    },
+    cardList: {
+      paddingHorizontal: 16,
+      gap: 14,
+    },
+  })
+}
