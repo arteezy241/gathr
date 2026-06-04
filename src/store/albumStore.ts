@@ -6,6 +6,8 @@ import {
   deleteAlbum,
   getAlbums,
   removeAssetsFromAlbum as dbRemoveAssets,
+  renameAlbum as dbRenameAlbum,
+  setAlbumPrivate as dbSetAlbumPrivate,
 } from '@/lib/db'
 
 interface AlbumState {
@@ -15,11 +17,13 @@ interface AlbumState {
   loadAlbums: () => Promise<void>
   addAlbum: (name: string, isPrivate: boolean) => Promise<string>
   removeAlbum: (id: string) => Promise<void>
+  renameAlbum: (id: string, name: string) => Promise<void>
+  toggleAlbumPrivate: (id: string) => Promise<void>
   addAssetsToAlbum: (albumId: string, assetIds: string[]) => Promise<void>
   removeAssetsFromAlbum: (albumId: string, assetIds: string[]) => Promise<void>
 }
 
-export const useAlbumStore = create<AlbumState>((set) => ({
+export const useAlbumStore = create<AlbumState>((set, get) => ({
   albums: [],
   isLoading: false,
   error: null,
@@ -43,6 +47,20 @@ export const useAlbumStore = create<AlbumState>((set) => ({
 
   removeAlbum: async (id) => {
     await deleteAlbum(id)
+    const albums = await getAlbums()
+    set({ albums })
+  },
+
+  renameAlbum: async (id, name) => {
+    await dbRenameAlbum(id, name)
+    const albums = await getAlbums()
+    set({ albums })
+  },
+
+  toggleAlbumPrivate: async (id) => {
+    const album = get().albums.find((a) => a.id === id)
+    if (!album) return
+    await dbSetAlbumPrivate(id, !album.isPrivate)
     const albums = await getAlbums()
     set({ albums })
   },
