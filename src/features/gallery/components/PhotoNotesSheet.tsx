@@ -98,6 +98,7 @@ export function PhotoNotesSheet({
   const [saved, setSaved] = useState(false)
   const [localNote, setLocalNote] = useState('')
   const translateY = useRef(new Animated.Value(SHEET_H - PEEK_H)).current
+  const didAutoExpand = useRef(false)
   const keyboardH = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
@@ -137,6 +138,14 @@ export function PhotoNotesSheet({
       useNativeDriver: true,
     }).start()
   }, [translateY, onDimChange])
+
+  // Auto-expand on first mount
+  useEffect(() => {
+    if (!didAutoExpand.current) {
+      didAutoExpand.current = true
+      expand()
+    }
+  }, [expand])
 
   const collapse = useCallback(() => {
     Keyboard.dismiss()

@@ -11,9 +11,12 @@ import { PILL_HEIGHT, PILL_MARGIN_BOTTOM } from '@/components/ui/FloatingTabBar'
 
 const GAP = 10
 const H_PAD = 16
-const CARD_SIZE = Math.floor((Dimensions.get('window').width - H_PAD * 2 - GAP) / 2)
+const CARD_W = Math.floor((Dimensions.get('window').width - H_PAD * 2 - GAP) / 2)
+const PHOTO_H = Math.floor(CARD_W * 0.75)
+const BODY_H = 88
 
 const AC = '#A488BE'
+const CARD_BG = '#0C0C0E'
 
 interface NoteRow {
   left: NoteEntry
@@ -28,17 +31,9 @@ function assetUri(id: string) {
 function buildRows(entries: NoteEntry[]): NoteRow[] {
   const rows: NoteRow[] = []
   for (let i = 0; i < entries.length; i += 2) {
-    rows.push({
-      left: entries[i] as NoteEntry,
-      right: entries[i + 1] ?? null,
-      rowIndex: i / 2,
-    })
+    rows.push({ left: entries[i] as NoteEntry, right: entries[i + 1] ?? null, rowIndex: i / 2 })
   }
   return rows
-}
-
-function keyExtractor(item: NoteRow) {
-  return `row-${item.rowIndex}`
 }
 
 function NoteCard({ entry, onPress }: { entry: NoteEntry; onPress: () => void }) {
@@ -51,31 +46,34 @@ function NoteCard({ entry, onPress }: { entry: NoteEntry; onPress: () => void })
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 4 }).start()
   }
 
-  const preview = entry.noteText.length > 60
-    ? entry.noteText.slice(0, 60).trimEnd() + '…'
+  const preview = entry.noteText.length > 55
+    ? entry.noteText.slice(0, 55).trimEnd() + '…'
     : entry.noteText
 
   return (
     <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
       <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
-        {/* Photo */}
-        <Image
-          source={{ uri: assetUri(entry.assetId) }}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          recyclingKey={entry.assetId}
-          transition={200}
-        />
 
-        {/* Gradient scrim */}
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.82)']}
-          style={styles.scrim}
-          pointerEvents="none"
-        />
+        {/* Photo thumbnail */}
+        <View style={styles.photoWrap}>
+          <Image
+            source={{ uri: assetUri(entry.assetId) }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            recyclingKey={entry.assetId}
+            transition={200}
+          />
+          {/* Subtle bottom fade into card body */}
+          <LinearGradient
+            colors={['transparent', CARD_BG]}
+            style={styles.photoFade}
+            pointerEvents="none"
+          />
+        </View>
 
-        {/* Note content */}
-        <View style={styles.cardBody}>
+        {/* Text body */}
+        <View style={styles.body}>
+          <Text style={styles.noteText} numberOfLines={3}>{preview}</Text>
           {entry.tags.length > 0 && (
             <View style={styles.tagRow}>
               {entry.tags.slice(0, 2).map((tag) => (
@@ -88,13 +86,8 @@ function NoteCard({ entry, onPress }: { entry: NoteEntry; onPress: () => void })
               )}
             </View>
           )}
-          <Text style={styles.notePreview} numberOfLines={2}>{preview}</Text>
         </View>
 
-        {/* Corner dot */}
-        <View style={styles.dot}>
-          <Ionicons name="document-text" size={9} color="#fff" />
-        </View>
       </Animated.View>
     </Pressable>
   )
@@ -119,6 +112,7 @@ export default function NotesScreen() {
   }, [])
 
   const rows = buildRows(entries)
+  const cardTotalH = PHOTO_H + BODY_H
 
   function openPhoto(assetId: string) {
     router.push({
@@ -134,7 +128,7 @@ export default function NotesScreen() {
         {item.right !== null ? (
           <NoteCard entry={item.right} onPress={() => { openPhoto(item.right!.assetId) }} />
         ) : (
-          <View style={styles.card} />
+          <View style={[styles.card, { opacity: 0 }]} />
         )}
       </View>
     )
@@ -146,7 +140,7 @@ export default function NotesScreen() {
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         {/* Header */}
         <View style={styles.header}>
-          <Pressable onPress={() => { router.back() }} hitSlop={12} style={styles.backBtn}>
+          <Pressable onPress={() => { router.back() }} hitSlop={12}>
             <Ionicons name="chevron-back" size={22} color={colors.text} />
           </Pressable>
           <View style={{ flex: 1 }}>
@@ -172,11 +166,11 @@ export default function NotesScreen() {
         ) : (
           <FlatList
             data={rows}
-            keyExtractor={keyExtractor}
+            keyExtractor={(item) => `row-${item.rowIndex}`}
             renderItem={renderRow}
             contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
             showsVerticalScrollIndicator={false}
-            getItemLayout={(_, index) => ({ length: CARD_SIZE + GAP, offset: (CARD_SIZE + GAP) * index, index })}
+            getItemLayout={(_, index) => ({ length: cardTotalH + GAP, offset: (cardTotalH + GAP) * index, index })}
           />
         )}
       </View>
@@ -197,9 +191,6 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 16,
   },
-  backBtn: {
-    marginRight: 2,
-  },
   title: {
     fontSize: 22,
     fontWeight: '700',
@@ -219,33 +210,48 @@ const styles = StyleSheet.create({
     gap: GAP,
   },
   card: {
-    width: CARD_SIZE,
-    height: CARD_SIZE,
+    width: CARD_W,
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: '#1A1A1E',
+    backgroundColor: CARD_BG,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  scrim: {
+  photoWrap: {
+    width: CARD_W,
+    height: PHOTO_H,
+    backgroundColor: '#1A1A1E',
+    overflow: 'hidden',
+  },
+  photoFade: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: CARD_SIZE * 0.65,
+    height: 28,
   },
-  cardBody: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 12,
+  body: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+    minHeight: BODY_H,
+    gap: 8,
+  },
+  noteText: {
+    color: 'rgba(235,235,245,0.85)',
+    fontSize: 12,
+    fontWeight: '400',
+    lineHeight: 18,
+    letterSpacing: 0.05,
+    flex: 1,
   },
   tagRow: {
     flexDirection: 'row',
     gap: 5,
-    marginBottom: 6,
     flexWrap: 'wrap',
   },
   tagPill: {
-    backgroundColor: 'rgba(164,136,190,0.30)',
+    backgroundColor: 'rgba(164,136,190,0.18)',
     borderRadius: 8,
     paddingHorizontal: 7,
     paddingVertical: 2,
@@ -257,28 +263,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
   },
   tagMore: {
-    color: 'rgba(164,136,190,0.55)',
+    color: 'rgba(164,136,190,0.45)',
     fontSize: 10,
     fontWeight: '500',
     alignSelf: 'center',
-  },
-  notePreview: {
-    color: 'rgba(235,235,245,0.90)',
-    fontSize: 12,
-    fontWeight: '400',
-    lineHeight: 17,
-    letterSpacing: 0.05,
-  },
-  dot: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: 'rgba(164,136,190,0.70)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   empty: {
     flex: 1,
